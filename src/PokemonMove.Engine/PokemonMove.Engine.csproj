@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include="../PokemonMove.Domain/PokemonMove.Domain.csproj"/><PackageReference Include="PKHeX.Core" Version="26.10.18"/></ItemGroup></Project>
