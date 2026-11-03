@@ -40,7 +40,9 @@ public sealed class HgssPokemonCodec : IPokemonCodec
                 At(strings.natures, (int)p.Nature), At(strings.abilitylist, p.Ability),
                 p.HeldItem == 0 ? "なし" : At(strings.itemlist, p.HeldItem),
                 new(calculated.Stat_HPMax, calculated.Stat_ATK, calculated.Stat_DEF, calculated.Stat_SPA, calculated.Stat_SPD, calculated.Stat_SPE),
-                p.PartyStatsPresent ? p.Stat_HPCurrent : null);
+                p.PartyStatsPresent ? p.Stat_HPCurrent : null,
+                new(p.EV_HP, p.EV_ATK, p.EV_DEF, p.EV_SPA, p.EV_SPD, p.EV_SPE),
+                new(p.IV_HP, p.IV_ATK, p.IV_DEF, p.IV_SPA, p.IV_SPD, p.IV_SPE), p.TID16);
         }
         return new(slot, p.Species, At(strings.specieslist, p.Species), p.Nickname,
             p.CurrentLevel, string.Join(" / ", types),

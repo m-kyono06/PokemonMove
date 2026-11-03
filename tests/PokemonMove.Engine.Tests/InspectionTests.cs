@@ -25,6 +25,41 @@ public sealed class InspectionTests
     }
 
     [Fact]
+    public void ReadsTrainingAndOriginalTrainerFromStoredDataWithoutChangingIt()
+    {
+        var pk = new PK4 { Species = 152, CurrentLevel = 50, PID = 0, TID16 = 42, SID16 = 54321,
+            EV_HP = 6, EV_ATK = 252, EV_DEF = 0, EV_SPA = 1, EV_SPD = 2, EV_SPE = 249,
+            IV_HP = 31, IV_ATK = 30, IV_DEF = 0, IV_SPA = 31, IV_SPD = 15, IV_SPE = 1 };
+        var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
+        var before = data.ToArray();
+        var summary = new HgssPokemonCodec().Decode(data);
+        var d = Assert.IsType<PokemonDetails>(summary.Details);
+        Assert.Equal(new PokemonBattleStats(6, 252, 0, 1, 2, 249), d.EffortValues);
+        Assert.Equal(new PokemonBattleStats(31, 30, 0, 31, 15, 1), d.IndividualValues);
+        Assert.Equal(510, d.TotalEffortValues);
+        Assert.Equal(2, d.PerfectIVCount);
+        Assert.Equal((ushort)42, d.OriginalTrainerId);
+        Assert.Equal("00042", d.OriginalTrainerId.ToString("D5"));
+        Assert.Equal(before, data);
+        Assert.Equal(before, summary.StoredData);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(30, 0)]
+    [InlineData(31, 6)]
+    public void CountsOnlyExactly31AsPerfectIV(int iv, int expected)
+    {
+        var pk = new PK4 { Species = 25, CurrentLevel = 10, TID16 = 65535,
+            IV_HP = iv, IV_ATK = iv, IV_DEF = iv, IV_SPA = iv, IV_SPD = iv, IV_SPE = iv };
+        var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
+        var d = Assert.IsType<PokemonDetails>(new HgssPokemonCodec().Decode(data).Details);
+        Assert.Equal(expected, d.PerfectIVCount);
+        Assert.Equal(0, d.TotalEffortValues);
+        Assert.Equal("65535", d.OriginalTrainerId.ToString("D5"));
+    }
+
+    [Fact]
     public void SelectionPublishesDisplayOnlyCopyAndCanSwitchToDex()
     {
         var inspection = new PokemonInspection();

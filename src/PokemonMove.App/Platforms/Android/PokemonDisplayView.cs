@@ -61,21 +61,35 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         }
         Portrait(c);
         Text(c, p.Nickname, 20, 280, 20);
-        Text(c, p.Type, 20, 306, 16, "AFC2CD");
-        Text(c, p.Form == 0 ? "" : $"フォルム {p.Form}（画像は代表）", 20, 332, 13, "AFC2CD");
+        Text(c, p.Type, 20, 303, 16, "AFC2CD");
+        Text(c, p.Form == 0 ? "" : $"フォルム {p.Form}（画像は代表）", 20, 323, 13, "AFC2CD");
         var d = p.Details;
         Text(c, $"Lv.{p.Level}  {d?.Gender}", 220, 98, 23);
         Text(c, $"性格：{d?.Nature ?? "—"} / 特性：{d?.Ability ?? "—"}", 220, 128, 16);
         Text(c, $"もちもの：{d?.HeldItem ?? "—"}", 220, 155, 16);
-        var s = d?.Stats;
-        Text(c, $"HP  {(d?.CurrentHP is { } hp ? hp + " / " : "")}{Value(s?.HP)}", 220, 190, 20);
-        Text(c, $"攻撃  {Value(s?.Attack)}", 420, 190, 20);
-        Text(c, $"防御  {Value(s?.Defense)}", 220, 225, 20);
-        Text(c, $"特攻  {Value(s?.SpecialAttack)}", 420, 225, 20);
-        Text(c, $"特防  {Value(s?.SpecialDefense)}", 220, 260, 20);
-        Text(c, $"素早さ  {Value(s?.Speed)}", 420, 260, 20);
+        Text(c, d is null ? "—V" : $"{d.PerfectIVCount}V（個体値31）", 425, 98, 18, "61DFC0");
+        Text(c, $"親のID：{(d is null ? "—" : d.OriginalTrainerId.ToString("D5"))}", 20, 345, 16);
+        Text(c, $"努力値合計：{Value(d?.TotalEffortValues)}", 20, 367, 16, "AFC2CD");
+        Text(c, "能力", 220, 180, 15, "AFC2CD");
+        Text(c, "実数値", 360, 180, 15, "AFC2CD");
+        Text(c, "努力値", 455, 180, 15, "AFC2CD");
+        Text(c, "個体値", 550, 180, 15, "AFC2CD");
+        var s = d?.Stats; var e = d?.EffortValues; var v = d?.IndividualValues;
+        StatRow(c, "HP", 202, s?.HP, e?.HP, v?.HP, d?.CurrentHP);
+        StatRow(c, "攻撃", 225, s?.Attack, e?.Attack, v?.Attack);
+        StatRow(c, "防御", 248, s?.Defense, e?.Defense, v?.Defense);
+        StatRow(c, "特攻", 271, s?.SpecialAttack, e?.SpecialAttack, v?.SpecialAttack);
+        StatRow(c, "特防", 294, s?.SpecialDefense, e?.SpecialDefense, v?.SpecialDefense);
+        StatRow(c, "素早さ", 317, s?.Speed, e?.Speed, v?.Speed);
         for (var i = 0; i < Math.Min(4, p.Moves.Count); i++)
-            Text(c, $"{i + 1}. {p.Moves[i]}", 220 + (i % 2) * 200, 305 + (i / 2) * 30, 16, "AFC2CD", 190);
+            Text(c, $"{i + 1}. {p.Moves[i]}", 220 + (i % 2) * 200, 343 + (i / 2) * 23, 16, "AFC2CD", 190);
+    }
+    private void StatRow(Canvas c, string label, float y, int? stat, int? effort, int? iv, int? currentHP = null)
+    {
+        Text(c, label, 220, y, 17);
+        Text(c, currentHP is { } hp ? $"{hp}/{Value(stat)}" : Value(stat), 350, y, 17, maxWidth: 100);
+        Text(c, Value(effort), 470, y, 17);
+        Text(c, Value(iv), 565, y, 17, iv == 31 ? "61DFC0" : "FFFFFF");
     }
     private void DrawSpecies(Canvas c, DexEntry p)
     {

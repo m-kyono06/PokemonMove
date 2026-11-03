@@ -2,7 +2,14 @@ namespace PokemonMove.Domain;
 
 public sealed record PokemonBattleStats(int HP, int Attack, int Defense, int SpecialAttack, int SpecialDefense, int Speed);
 public sealed record PokemonDetails(string Gender, string Nature, string Ability, string HeldItem,
-    PokemonBattleStats Stats, int? CurrentHP);
+    PokemonBattleStats Stats, int? CurrentHP, PokemonBattleStats EffortValues,
+    PokemonBattleStats IndividualValues, ushort OriginalTrainerId)
+{
+    public int PerfectIVCount => new[] { IndividualValues.HP, IndividualValues.Attack, IndividualValues.Defense,
+        IndividualValues.SpecialAttack, IndividualValues.SpecialDefense, IndividualValues.Speed }.Count(value => value == 31);
+    public int TotalEffortValues => EffortValues.HP + EffortValues.Attack + EffortValues.Defense
+        + EffortValues.SpecialAttack + EffortValues.SpecialDefense + EffortValues.Speed;
+}
 public sealed record InspectionSnapshot(PokemonSummary? Pokemon, DexEntry? Species, DexVariant Variant, string Context);
 public interface IPokemonInspection
 {
