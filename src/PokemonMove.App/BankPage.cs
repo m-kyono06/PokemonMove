@@ -1,4 +1,5 @@
 using PokemonMove.Domain;
+using PokemonMove.Engine;
 using PokemonMove.Infrastructure;
 using System.Security.Cryptography;
 
@@ -99,7 +100,7 @@ public sealed class BankPage : ContentPage
             Children =
             {
                 status, search, box, slots, selected, withdraw,
-                new Label { Text = "移動保管した個体は、保管元を含むD・P・Pt・HGSSセーブのボックスへ引き出せます。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
+                new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4世代→第5世代は一方向の変換です。第5世代から第4世代へは戻せません。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
         }};
@@ -146,7 +147,7 @@ public sealed class BankPage : ContentPage
                 if (busy) return;
                 using var operation = operations.Begin();
                 selectedItem = item; withdraw.IsEnabled = item.Entry.TransferEligible && !pendingMove;
-                selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
+                selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}（第{(item.Pokemon.FormatKey == "pk5" ? 5 : 4)}世代）" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
                 inspection.SelectPokemon(item.Pokemon, $"バンク / 保管元：{item.Entry.SourceGame}");
                 if (!dual.IsActive) await DisplayAlertAsync(item.Pokemon.Name, Detail(item.Pokemon), "閉じる");
             };
@@ -182,16 +183,20 @@ public sealed class BankPage : ContentPage
         var data = await target.ReadAsync();
         var save = await Task.Run(() => reader.Read(data));
         await registry.RegisterAsync(target.Id, save);
-        var choices = save.Boxes.Select((b, i) => $"{i + 1}: {b.Name}（空き{b.Slots.Count(p => p.Species == 0)}）").ToArray();
+        var transferDate = DateOnly.FromDateTime(DateTime.Today);
+        var plan = new PokemonTransfer().Prepare(item.Pokemon, save.FormatKey, transferDate);
+        if (save.UnlockedBoxCount == 0) throw new InvalidDataException("開放済みのボックスがありません。先にゲーム内でボックスを利用してください。");
+        var choices = save.Boxes.Take(save.UnlockedBoxCount ?? save.Boxes.Count).Select((b, i) => $"{i + 1}: {b.Name}（空き{b.Slots.Count(p => p.Species == 0)}）").ToArray();
         var selected = await DisplayActionSheetAsync($"{save.Game} / {save.TrainerName} の引き出し先", "キャンセル", null, choices);
         var index = Array.IndexOf(choices, selected);
         if (index < 0) return;
         var slot = save.Boxes[index].Slots.FirstOrDefault(p => p.Species == 0);
         if (slot is null) throw new InvalidDataException("そのボックスに空き枠がありません。");
-        if (!await DisplayAlertAsync("移動を確定", $"{save.Game} / {save.TrainerName}\n{save.Boxes[index].Name} の {slot.Slot + 1}番へ移動します。選択したセーブを書き換え、成功後にバンクから取り除きます。", "移動する", "キャンセル")) return;
-        await bank.MoveToSaveAsync(item.Entry.Id, target, new(false, index, slot.Slot), SHA256.HashData(data));
+        var notices = plan.Notices.Count == 0 ? "" : "\n\n" + string.Join("\n", plan.Notices);
+        if (!await DisplayAlertAsync(plan.IsGenerationTransfer ? "世代をまたぐ移動を確定" : "移動を確定", $"{save.Game} / {save.TrainerName}\n{save.Boxes[index].Name} の {slot.Slot + 1}番へ移動します。選択したセーブを書き換え、成功後にバンクから取り除きます。{notices}", plan.IsGenerationTransfer ? "第5世代へ移動" : "移動する", "キャンセル")) return;
+        await bank.MoveToSaveAsync(item.Entry.Id, target, new(false, index, slot.Slot), SHA256.HashData(data), transferDate);
         await Refresh();
-        inspection.SelectPokemon(item.Pokemon, $"{save.Game} / {save.TrainerName} / {save.Boxes[index].Name}へ移動しました");
+        inspection.SelectPokemon(plan.Pokemon, $"{save.Game} / {save.TrainerName} / {save.Boxes[index].Name}へ移動しました");
         await DisplayAlertAsync("移動完了", "セーブへの書き込みを確認し、バンクから取り除きました。", "閉じる");
     }
 

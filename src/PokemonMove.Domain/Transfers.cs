@@ -17,6 +17,8 @@ public interface ISaveDocuments
 public interface ISaveEditor
 {
     SaveEdit Remove(byte[] source, PokemonLocation location);
-    SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon);
+    SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon, string formatKey = "pk4", DateOnly? transferDate = null);
 }
 public sealed class SaveRecoveryRequiredException(string message) : IOException(message);
+
+public sealed record PokemonTransferPlan(PokemonSummary Pokemon, bool IsGenerationTransfer, IReadOnlyList<string> Notices);

@@ -15,9 +15,9 @@ public sealed class Gen4SaveReader : PokemonMove.Domain.ISaveReader
         var save = Open(data);
         var warnings = save.ChecksumsValid ? Array.Empty<string>() :
             new[] { "追加領域（殿堂入り・バトルビデオ等）のチェックサムに不一致があります。手持ち・ボックスの検証は正常です。追加領域は変更しません。" };
-        var party = Enumerable.Range(0, save.PartyCount).Select(i => Gen4PokemonCodec.Describe(save.GetPartySlotAtIndex(i), i)).ToArray();
+        var party = Enumerable.Range(0, save.PartyCount).Select(i => PokemonCodec.Describe(save.GetPartySlotAtIndex(i), i)).ToArray();
         var boxes = Enumerable.Range(0, save.BoxCount).Select(b => new BoxSnapshot(((IBoxDetailName)save).GetBoxName(b),
-            Enumerable.Range(0, save.BoxSlotCount).Select(s => Gen4PokemonCodec.Describe(save.GetBoxSlotAtIndex(b, s), s)).ToArray())).ToArray();
+            Enumerable.Range(0, save.BoxSlotCount).Select(s => PokemonCodec.Describe(save.GetBoxSlotAtIndex(b, s), s)).ToArray())).ToArray();
         var (game, format) = save switch
         {
             // The DP save format does not reliably distinguish Diamond from Pearl.

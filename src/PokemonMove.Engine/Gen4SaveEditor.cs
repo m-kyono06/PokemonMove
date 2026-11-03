@@ -12,7 +12,7 @@ public sealed class Gen4SaveEditor : ISaveEditor
         var (save, snapshot) = Open(source);
         ValidateLocation(save, location);
         var pokemon = location.IsParty ? save.GetPartySlotAtIndex(location.Slot) : save.GetBoxSlotAtIndex(location.Box, location.Slot);
-        var summary = Gen4PokemonCodec.Describe(pokemon, location.Slot);
+        var summary = PokemonCodec.Describe(pokemon, location.Slot);
         if (!summary.CanStore) throw new InvalidDataException("空き枠または検証に失敗した個体は移動できません。");
         if (ItemStorage4.Mail.Contains((ushort)pokemon.HeldItem)) throw new InvalidDataException("メールを持っているポケモンは、ゲーム内でメールを外してから移動してください。");
         if (location.IsParty)
@@ -30,14 +30,15 @@ public sealed class Gen4SaveEditor : ISaveEditor
         return new(Finish(source, save), summary, snapshot.Game, snapshot.TrainerName);
     }
 
-    public SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon)
+    public SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon, string formatKey = "pk4", DateOnly? transferDate = null)
     {
         var (save, snapshot) = Open(source);
         if (location.IsParty) throw new InvalidDataException("引き出し先はボックスの空き枠を選択してください。");
         ValidateLocation(save, location);
         if (save.GetBoxSlotAtIndex(location.Box, location.Slot).Species != 0)
             throw new InvalidDataException("引き出し先の枠は空いていません。");
-        var summary = new Gen4PokemonCodec().Decode(pokemon);
+        if (formatKey != "pk4") throw new InvalidDataException("第5世代の個体を第4世代へ戻すことはできません。");
+        var summary = new Gen4PokemonCodec().Decode(pokemon, formatKey);
         // Do not insert a second byte-identical instance into the destination save.
         if (snapshot.Party.Concat(snapshot.Boxes.SelectMany(b => b.Slots))
             .Any(p => p.CanStore && p.StoredData.AsSpan().SequenceEqual(summary.StoredData)))

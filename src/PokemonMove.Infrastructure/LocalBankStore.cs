@@ -12,7 +12,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     private readonly string path = Path.Combine(directory, "bank.json");
     private readonly SemaphoreSlim gate = new(1, 1);
     private sealed record PendingMove(Guid Id, string DocumentId, bool Deposit, PokemonLocation Location,
-        BankEntry Entry, byte[] Before, byte[] After);
+        BankEntry Entry, byte[] Before, byte[] After, DateOnly? TransferDate = null);
     private sealed record Document(int Version, List<BankEntry> Entries, List<Guid>? Spent = null, PendingMove? Pending = null);
 
     public async Task<IReadOnlyList<BankItem>> ListAsync()
@@ -26,17 +26,17 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     {
         if (string.IsNullOrWhiteSpace(game) || trainer is null) throw new InvalidDataException("コピー元の情報が不正です。");
         if (!pokemon.CanStore) throw new InvalidDataException("このポケモンは保管できません。");
-        var data = codec.Decode(pokemon.StoredData.ToArray()).StoredData;
+        var data = codec.Decode(pokemon.StoredData.ToArray(), pokemon.FormatKey).StoredData;
         await gate.WaitAsync();
         try
         {
             var doc = await ReadAsync();
             EnsureIdle(doc);
-            var fingerprint = Fingerprint(data);
-            var existing = doc.Entries.FirstOrDefault(e => Fingerprint(e.Data) == fingerprint);
+            var fingerprint = Fingerprint(data, pokemon.FormatKey);
+            var existing = doc.Entries.FirstOrDefault(e => Fingerprint(e.Data, e.FormatKey) == fingerprint);
             if (existing is not null) return new(ToItem(existing), false);
             if (doc.Entries.Count >= MaximumEntries) throw new InvalidDataException("バンクの保管上限に達しています。");
-            var entry = new BankEntry(Guid.NewGuid(), game, trainer, DateTimeOffset.UtcNow, data);
+            var entry = new BankEntry(Guid.NewGuid(), game, trainer, DateTimeOffset.UtcNow, data) { FormatKey = pokemon.FormatKey };
             doc.Entries.Add(entry);
             await WriteAsync(doc);
             return new(ToItem(entry), true);
@@ -62,11 +62,11 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             EnsureIdle(imported);
             var spent = current.Spent!.Union(imported.Spent!).ToList();
             current.Entries.RemoveAll(e => spent.Contains(e.Id));
-            var hashes = current.Entries.Select(e => Fingerprint(e.Data)).ToHashSet();
+            var hashes = current.Entries.Select(e => Fingerprint(e.Data, e.FormatKey)).ToHashSet();
             var added = 0;
             foreach (var entry in imported.Entries)
             {
-                if (spent.Contains(entry.Id) || !hashes.Add(Fingerprint(entry.Data))) continue;
+                if (spent.Contains(entry.Id) || !hashes.Add(Fingerprint(entry.Data, entry.FormatKey))) continue;
                 if (current.Entries.Any(e => e.Id == entry.Id)) throw new InvalidDataException("バックアップ内の識別情報が重複しています。");
                 current.Entries.Add(entry with { Data = entry.Data.ToArray() });
                 added++;
@@ -107,17 +107,17 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             var doc = await ReadAsync(); EnsureIdle(doc);
             var before = await source.ReadAsync(); CheckExpected(before, expectedHash);
             var edit = RequireEditor().Remove(before, location);
-            var fingerprint = Fingerprint(edit.Pokemon.StoredData);
-            var matching = doc.Entries.FirstOrDefault(e => Fingerprint(e.Data) == fingerprint);
+            var fingerprint = Fingerprint(edit.Pokemon.StoredData, edit.Pokemon.FormatKey);
+            var matching = doc.Entries.FirstOrDefault(e => Fingerprint(e.Data, e.FormatKey) == fingerprint);
             if (matching?.TransferEligible == true) throw new InvalidDataException("同じデータはすでに移動保管されています。");
             if (matching is null && doc.Entries.Count >= MaximumEntries) throw new InvalidDataException("バンクが満杯です。");
-            var entry = new BankEntry(matching?.Id ?? Guid.NewGuid(), edit.Game, edit.Trainer, DateTimeOffset.UtcNow, edit.Pokemon.StoredData) { TransferEligible = true };
+            var entry = new BankEntry(matching?.Id ?? Guid.NewGuid(), edit.Game, edit.Trainer, DateTimeOffset.UtcNow, edit.Pokemon.StoredData) { TransferEligible = true, FormatKey = edit.Pokemon.FormatKey };
             await ExecuteAsync(doc, new(Guid.NewGuid(), source.Id, true, location, entry, before, edit.After), source);
         }
         finally { gate.Release(); }
     }
 
-    public async Task MoveToSaveAsync(Guid entryId, ISaveDocument target, PokemonLocation location, byte[] expectedHash)
+    public async Task MoveToSaveAsync(Guid entryId, ISaveDocument target, PokemonLocation location, byte[] expectedHash, DateOnly? transferDate = null)
     {
         await gate.WaitAsync();
         try
@@ -126,8 +126,8 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             var entry = doc.Entries.SingleOrDefault(e => e.Id == entryId) ?? throw new InvalidDataException("バンクに見つかりません。");
             if (!entry.TransferEligible) throw new InvalidDataException("旧版のコピー保管データです。元セーブの同じ個体を移動保管し直してください。");
             var before = await target.ReadAsync(); CheckExpected(before, expectedHash);
-            var edit = RequireEditor().Insert(before, location, entry.Data);
-            await ExecuteAsync(doc, new(Guid.NewGuid(), target.Id, false, location, entry, before, edit.After), target);
+            var edit = RequireEditor().Insert(before, location, entry.Data, entry.FormatKey, transferDate);
+            await ExecuteAsync(doc, new(Guid.NewGuid(), target.Id, false, location, entry, before, edit.After, transferDate), target);
         }
         finally { gate.Release(); }
     }
@@ -178,8 +178,8 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         var pending = doc.Pending!;
         if (pending.Deposit)
         {
-            var hash = Fingerprint(pending.Entry.Data);
-            doc.Entries.RemoveAll(e => e.Id == pending.Entry.Id || Fingerprint(e.Data) == hash);
+            var hash = Fingerprint(pending.Entry.Data, pending.Entry.FormatKey);
+            doc.Entries.RemoveAll(e => e.Id == pending.Entry.Id || Fingerprint(e.Data, e.FormatKey) == hash);
             doc.Entries.Add(pending.Entry);
         }
         else
@@ -258,7 +258,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         if (!File.Exists(path))
         {
             if (File.Exists(path + ".bak") || File.Exists(Path.Combine(directory, "moves.lock"))) throw new InvalidDataException("バンクが見つかりません。移動履歴を保護するため自動初期化しません。ファイルとバックアップを保持してください。");
-            return new(2, [], []);
+            return new(3, [], []);
         }
         return Parse(await ReadBoundedAsync(path));
     }
@@ -278,7 +278,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         Document? doc;
         try { doc = JsonSerializer.Deserialize<Document>(data); }
         catch (JsonException ex) { throw new InvalidDataException("バンクの形式が不正です。ファイルは変更していません。", ex); }
-        if (doc is null || doc.Version is not (1 or 2) || doc.Entries is null || doc.Entries.Count > MaximumEntries)
+        if (doc is null || doc.Version is not (1 or 2 or 3) || doc.Entries is null || doc.Entries.Count > MaximumEntries)
             throw new InvalidDataException("対応していないバンク形式です。");
         var ids = new HashSet<Guid>();
         for (var index = 0; index < doc.Entries.Count; index++)
@@ -287,10 +287,12 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             if (entry is null || entry.Id == Guid.Empty || !ids.Add(entry.Id) || entry.Data is null ||
                 string.IsNullOrWhiteSpace(entry.SourceGame) || entry.SourceTrainer is null)
                 throw new InvalidDataException("バンクの記録が不正です。");
+            if (doc.Version < 3 && entry.FormatKey != "pk4")
+                throw new InvalidDataException("旧形式のバンクに第5世代の記録が含まれています。");
             // Canonicalize so decrypted/imported representations cannot bypass deduplication.
-            doc.Entries[index] = entry with { Data = codec.Decode(entry.Data).StoredData, TransferEligible = doc.Version == 2 && entry.TransferEligible };
+            doc.Entries[index] = entry with { Data = codec.Decode(entry.Data, entry.FormatKey).StoredData, TransferEligible = doc.Version >= 2 && entry.TransferEligible };
         }
-        doc = doc with { Version = 2, Spent = doc.Spent ?? [] };
+        doc = doc with { Version = 3, Spent = doc.Spent ?? [] };
         if (doc.Spent.Any(id => id == Guid.Empty) || doc.Entries.Any(e => doc.Spent.Contains(e.Id)))
             throw new InvalidDataException("バンクの移動履歴が不正です。");
         if (doc.Pending is { } pending)
@@ -298,10 +300,10 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             if (editor is null || pending.Id == Guid.Empty || string.IsNullOrWhiteSpace(pending.DocumentId) ||
                 pending.Before is null || pending.After is null || pending.Entry is null || !pending.Entry.TransferEligible)
                 throw new InvalidDataException("中断した移動の情報を確認できません。");
-            var edit = pending.Deposit ? editor.Remove(pending.Before, pending.Location) : editor.Insert(pending.Before, pending.Location, pending.Entry.Data);
-            if (!edit.After.AsSpan().SequenceEqual(pending.After) || !edit.Pokemon.StoredData.AsSpan().SequenceEqual(pending.Entry.Data))
+            var edit = pending.Deposit ? editor.Remove(pending.Before, pending.Location) : editor.Insert(pending.Before, pending.Location, pending.Entry.Data, pending.Entry.FormatKey, pending.TransferDate);
+            if (!edit.After.AsSpan().SequenceEqual(pending.After) || !edit.Pokemon.StoredData.AsSpan().SequenceEqual(pending.Entry.Data) || edit.Pokemon.FormatKey != pending.Entry.FormatKey)
                 throw new InvalidDataException("中断した移動の整合性を確認できません。");
-            if (!pending.Deposit && !doc.Entries.Any(e => e.Id == pending.Entry.Id && e.TransferEligible && e.Data.AsSpan().SequenceEqual(pending.Entry.Data)))
+            if (!pending.Deposit && !doc.Entries.Any(e => e.Id == pending.Entry.Id && e.TransferEligible && e.FormatKey == pending.Entry.FormatKey && e.Data.AsSpan().SequenceEqual(pending.Entry.Data)))
                 throw new InvalidDataException("中断した引き出しの保管データが見つかりません。");
         }
         return doc;
@@ -327,7 +329,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    private BankItem ToItem(BankEntry entry) => new(entry, codec.Decode(entry.Data));
-    private static string Fingerprint(byte[] data) => Convert.ToHexString(SHA256.HashData(data));
+    private BankItem ToItem(BankEntry entry) => new(entry, codec.Decode(entry.Data, entry.FormatKey));
+    private static string Fingerprint(byte[] data, string formatKey) => formatKey + ":" + Convert.ToHexString(SHA256.HashData(data));
     private static byte[] Serialize(Document doc) => JsonSerializer.SerializeToUtf8Bytes(doc);
 }

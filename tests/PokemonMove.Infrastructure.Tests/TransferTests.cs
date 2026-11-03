@@ -246,7 +246,7 @@ public sealed class TransferTests : IDisposable
     [Fact]
     public async Task CollectionTracksOwnershipAsPokemonMovesBetweenSaveAndBank()
     {
-        var file = new File(); var bank = Bank(); var dex = new Gen4CollectionDex();
+        var file = new File(); var bank = Bank(); var dex = new CollectionDex();
         var before = dex.Build(View(file.Data), await bank.ListAsync());
         var count = before.Owned(DexVariant.All);
         Assert.Equal(1, before.Entries[151].BoxCount);

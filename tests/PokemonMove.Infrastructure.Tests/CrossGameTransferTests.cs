@@ -35,7 +35,7 @@ public sealed class CrossGameTransferTests : IDisposable
     {
         var source = new Document("source", Gen4Fixtures.Create(sourceGame, dsv: true));
         var target = new Document("target", Gen4Fixtures.Create(targetGame, dsv: true, boxPokemon: new PK4 { Species = 25, PID = 234, CurrentLevel = 10 }));
-        var reader = new Gen4SaveReader(); var bank = Bank(); var dex = new Gen4CollectionDex();
+        var reader = new Gen4SaveReader(); var bank = Bank(); var dex = new CollectionDex();
         var original = source.Data.ToArray(); var targetOriginal = target.Data.ToArray();
         var pokemon = reader.Read(original).Boxes[17].Slots[29];
         var initial = dex.BuildAll([reader.Read(source.Data), reader.Read(target.Data)], await bank.ListAsync());

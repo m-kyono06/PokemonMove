@@ -110,7 +110,7 @@ public sealed class RegisteredSavesTests : IDisposable
         var registry = Registry(); var files = new Documents(); var reader = new Reader();
         await registry.RegisterAsync("ss", reader.Read([1])); await registry.RegisterAsync("hg", reader.Read([2]));
         var library = new RegisteredSaveLibraryReader(Registry(), files, reader);
-        var dex = new Gen4CollectionDex();
+        var dex = new CollectionDex();
         var first = dex.BuildAll(await library.ReadAllAsync(), []);
         Assert.Equal(2, first.SaveCount); Assert.Equal(2, first.Owned(DexVariant.All));
         files.Data["ss"] = [3]; // The game changed; an old ownership cache must not be reused.
