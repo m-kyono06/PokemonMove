@@ -32,13 +32,13 @@ public sealed class Gen6BankTests : IDisposable
             return Task.CompletedTask;
         }
     }
-    public static IEnumerable<object[]> Pairs=>from a in new[]{GameVersion.X,GameVersion.Y} from b in new[]{GameVersion.X,GameVersion.Y} select new object[]{a,b};
+    public static IEnumerable<object[]> Pairs=>from a in new[]{GameVersion.X,GameVersion.Y,GameVersion.OR,GameVersion.AS} from b in new[]{GameVersion.X,GameVersion.Y,GameVersion.OR,GameVersion.AS} select new object[]{a,b};
     public static IEnumerable<object[]> ForwardPairs=>from a in new[]{GameVersion.B,GameVersion.W,GameVersion.B2,GameVersion.W2}
-        from b in new[]{GameVersion.X,GameVersion.Y} select new object[]{a,b};
+        from b in new[]{GameVersion.X,GameVersion.Y,GameVersion.OR,GameVersion.AS} select new object[]{a,b};
 
     [Theory]
     [MemberData(nameof(Pairs))]
-    public async Task XYBankMovesKeepExactPokemonAndConsumeEntryAfterVerifiedWrite(GameVersion a,GameVersion b)
+    public async Task Gen6BankMovesKeepExactPokemonAndConsumeEntryAfterVerifiedWrite(GameVersion a,GameVersion b)
     {
         var source=new Document("source",Gen6Fixtures.Create(a));
         var target=new Document("target",Gen6Fixtures.Create(b,boxPokemon:new PK6{Species=721,PID=987,EncryptionConstant=123,CurrentLevel=30}));
@@ -63,12 +63,12 @@ public sealed class Gen6BankTests : IDisposable
 
     [Theory]
     [MemberData(nameof(ForwardPairs))]
-    public async Task AllBWGamesCanMoveForwardButPK6CanNeverReturnToDS(GameVersion a,GameVersion b)
+    public async Task AllBWGamesCanMoveToAllGen6GamesButNeverReturnToDS(GameVersion a,GameVersion b)
     {
         var source=new Document("bw",Gen5Fixtures.Create(a));var target=new Document("xy",Gen6Fixtures.Create(b));
         await Bank().MoveIntoBankAsync(source,new(false,23,29),Hash(source.Data));
         var entry=Assert.Single(await Bank().ListAsync());var backup=await Bank().ExportAsync();
-        var plan=new PokemonTransfer().Prepare(entry.Pokemon,"xy",trainer:View(target.Data).TransferTrainer);
+        var plan=new PokemonTransfer().Prepare(entry.Pokemon,View(target.Data).FormatKey,trainer:View(target.Data).TransferTrainer);
         await Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data));
         Assert.Empty(await Bank().ListAsync());Assert.Equal(0,await Bank().ImportAsync(backup));
         var moved=View(target.Data).Boxes[0].Slots[0];Assert.Equal("pk6",moved.FormatKey);Assert.Equal(plan.Pokemon.StoredData,moved.StoredData);
@@ -79,15 +79,21 @@ public sealed class Gen6BankTests : IDisposable
     }
 
     [Theory]
-    [InlineData("before")]
-    [InlineData("after")]
-    [InlineData("partial")]
-    public async Task InterruptedGenerationConversionReproducesExactOutputAndRecovers(string failure)
+    [InlineData("before",GameVersion.X)]
+    [InlineData("after",GameVersion.X)]
+    [InlineData("partial",GameVersion.X)]
+    [InlineData("before",GameVersion.OR)]
+    [InlineData("after",GameVersion.OR)]
+    [InlineData("partial",GameVersion.OR)]
+    [InlineData("before",GameVersion.AS)]
+    [InlineData("after",GameVersion.AS)]
+    [InlineData("partial",GameVersion.AS)]
+    public async Task InterruptedGenerationConversionReproducesExactOutputAndRecovers(string failure,GameVersion targetVersion)
     {
-        var source=new Document("bw2",Gen5Fixtures.Create(GameVersion.B2));var target=new Document("x",Gen6Fixtures.Create(GameVersion.X));
+        var source=new Document("bw2",Gen5Fixtures.Create(GameVersion.B2));var target=new Document("x",Gen6Fixtures.Create(targetVersion));
         var original=target.Data.ToArray();
         await Bank().MoveIntoBankAsync(source,new(false,23,29),Hash(source.Data));var entry=Assert.Single(await Bank().ListAsync());
-        var plan=new PokemonTransfer().Prepare(entry.Pokemon,"xy",trainer:View(target.Data).TransferTrainer);
+        var plan=new PokemonTransfer().Prepare(entry.Pokemon,View(target.Data).FormatKey,trainer:View(target.Data).TransferTrainer);
         target.Failure=failure;
         await Assert.ThrowsAsync<IOException>(()=>Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data)));
         RecentTrainerCache.SetRecentTrainer(new SimpleTrainerInfo(GameVersion.OR){OT="別の親",Gender=1});
@@ -133,6 +139,21 @@ public sealed class Gen6BankTests : IDisposable
         await Bank().MoveToSaveAsync(pk5.Entry.Id,x,new(false,0,0),Hash(x.Data));
         Assert.Empty(await Bank().ListAsync());Assert.Equal((ushort)0,View(ss.Data).Boxes[17].Slots[29].Species);Assert.Equal((ushort)0,View(b2.Data).Boxes[0].Slots[0].Species);
         Assert.Equal((ushort)387,View(x.Data).Boxes[0].Slots[0].Species);Assert.Equal("pk6",View(x.Data).Boxes[0].Slots[0].FormatKey);
+    }
+
+    [Fact]
+    public async Task OrasOnlyIndividualStaysInBankWhenXYRefusesItAndCanReturnToOras()
+    {
+        var source=new Document("oras",Gen6Fixtures.Create(GameVersion.OR,boxPokemon:new PK6{Species=25,Form=1,CurrentLevel=20,Version=GameVersion.OR}));
+        var target=new Document("xy",Gen6Fixtures.Create(GameVersion.Y));var before=target.Data.ToArray();
+        await Bank().MoveIntoBankAsync(source,new(false,30,29),Hash(source.Data));var entry=Assert.Single(await Bank().ListAsync());
+        var backup=await Bank().ExportAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(()=>Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data)));
+        Assert.Equal(before,target.Data);Assert.Equal(0,target.Writes);Assert.Equal(entry.Entry.Id,Assert.Single(await Bank().ListAsync()).Entry.Id);
+        Assert.False(await Bank().HasPendingMoveAsync());
+        await Bank().MoveToSaveAsync(entry.Entry.Id,source,new(false,30,29),Hash(source.Data));
+        Assert.Empty(await Bank().ListAsync());Assert.Equal(entry.Pokemon.StoredData,View(source.Data).Boxes[30].Slots[29].StoredData);
+        Assert.Equal(0,await Bank().ImportAsync(backup));
     }
 
     public void Dispose(){if(Directory.Exists(root))Directory.Delete(root,true);}

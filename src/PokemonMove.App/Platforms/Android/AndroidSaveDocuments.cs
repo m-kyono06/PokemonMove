@@ -32,7 +32,7 @@ internal sealed class AndroidSaveDocument(Android.Net.Uri uri) : ISaveDocument
             int count;
             while ((count = await stream.ReadAsync(buffer)) != 0)
             {
-                if (memory.Length + count > GameSaveReader.MaximumFileSize) throw new InvalidDataException("対応作品の通常セーブ、またはXYのmainを選択してください。");
+                if (memory.Length + count > GameSaveReader.MaximumFileSize) throw new InvalidDataException("対応作品の通常セーブ、またはXY・ORASのmainを選択してください。");
                 memory.Write(buffer, 0, count);
             }
             return memory.ToArray();

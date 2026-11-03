@@ -156,4 +156,14 @@ public sealed class CollectionDexTests
         Assert.Equal(0, dex.Build(null, [Bank(wrong)]).Owned(DexVariant.All));
     }
 
+    [Fact]
+    public void OrasAndXYAreRetainedAlongsideDSAndBankInTheGlobalCollection()
+    {
+        var saves=new[]{GameVersion.X,GameVersion.Y,GameVersion.OR,GameVersion.AS}.Select(v=>new GameSaveReader().Read(PokemonMove.TestSupport.Gen6Fixtures.Create(v))).ToArray();
+        var collection=dex.BuildAll(saves,[]);
+        Assert.Equal(4,collection.SaveCount);Assert.Equal(721,collection.Entries.Count);
+        Assert.Equal(4,collection.Entries[649].BoxCount);
+        Assert.Equal(new[]{"X","Y","オメガルビー","アルファサファイア"},collection.Entries[649].Saves.Select(s=>s.Game));
+    }
+
 }

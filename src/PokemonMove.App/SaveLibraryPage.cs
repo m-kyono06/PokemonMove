@@ -80,7 +80,7 @@ public sealed class SaveLibraryPage : ContentPage
         var header = new VerticalStackLayout { Padding = 12, Spacing = 8, Children =
         {
             status, add,
-            new Label { Text = "登録したセーブすべて＋バンクを図鑑で集計します。登録をタップすると再接続・解除できます。現在の読込対応はD・P・Pt・HGSS・BW・BW2・XYです。", FontSize = 12, TextColor = Colors.LightGray }
+            new Label { Text = "登録したセーブすべて＋バンクを図鑑で集計します。登録をタップすると再接続・解除できます。現在の読込対応はD・P・Pt・HGSS・BW・BW2・XY・ORASです。", FontSize = 12, TextColor = Colors.LightGray }
         }};
         var footer = new VerticalStackLayout { Padding = 12, Spacing = 8, Children =
         {

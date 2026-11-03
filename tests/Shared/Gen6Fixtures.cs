@@ -7,9 +7,11 @@ internal static class Gen6Fixtures
 {
     internal static byte[] Create(GameVersion version, PK6? boxPokemon = null, int unlocked = 31)
     {
-        var save = new SAV6XY { Version = version, OT = "カルム", Gender = 0, Country = 1, Region = 2, ConsoleRegion = 0, Language = 1, BoxesUnlocked = unlocked };
+        SAV6 save = version is GameVersion.X or GameVersion.Y ? new SAV6XY() : new SAV6AO();
+        save.Version = version; save.OT = "カルム"; save.Gender = 0; save.Country = 1; save.Region = 2;
+        save.ConsoleRegion = 0; save.Language = 1; save.BoxesUnlocked = unlocked;
         save.TimeStampCurrent = 123456789;save.TimeStampPrevious = 987654;
-        const int metadata = 0x65400;
+        var metadata = save.Data.Length - 0x200;
         BinaryPrimitives.WriteUInt32LittleEndian(save.Data[(metadata + 0x10)..], 0x42454546);
         foreach (var block in save.AllBlocks)
         {
@@ -25,9 +27,9 @@ internal static class Gen6Fixtures
         var boxed = boxPokemon ?? new PK6 { Species = 650, Nickname = "ハリ", CurrentLevel = 50, PID = 91, EncryptionConstant = 333,
             Version = version, TID16 = 42, IV_HP = 31, IV_ATK = 31, IV_DEF = 31, IV_SPA = 31, IV_SPD = 31, IV_SPE = 31,
             EV_SPE = 252, EV_ATK = 252, EV_HP = 6, Nature = Nature.Adamant, Ability = 65, Move1 = 33 };
-        save.SetBoxSlotAtIndex(boxed, 30, 29, EntityImportSettings.None); save.SetBoxName(30, "さいご");
-        save.Data.Slice(0x570D0, 0x130).Fill(0xA5); // Padding outside box data, next to the photograph.
-        save.Data.Slice(0x57200, 0xE058).Fill(0x6B); // Opaque photograph bytes must be preserved.
+        save.SetBoxSlotAtIndex(boxed, 30, 29, EntityImportSettings.None); ((IBoxDetailName)save).SetBoxName(30, "さいご");
+        save.Data.Slice(save is SAV6AO ? 0x67AD0 : 0x570D0, 0x130).Fill(0xA5); // Padding outside box data, next to the photograph.
+        save.Data.Slice(save is SAV6AO ? 0x67C00 : 0x57200, 0xE058).Fill(0x6B); // Opaque photograph bytes must be preserved.
         return save.Write().ToArray();
     }
 }

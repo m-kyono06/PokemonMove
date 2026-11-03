@@ -194,7 +194,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     {
         var root = Path.Combine(directory, "save-backups");
         Directory.CreateDirectory(root);
-        var file = Path.Combine(root, pending.Id.ToString("N") + (pending.Before.Length == 0x65600 ? ".main" : pending.Before.Length == 0x80000 ? ".sav" : ".dsv"));
+        var file = Path.Combine(root, pending.Id.ToString("N") + (pending.Before.Length is 0x65600 or 0x76000 ? ".main" : pending.Before.Length == 0x80000 ? ".sav" : ".dsv"));
         if (File.Exists(file))
         {
             if (!(await File.ReadAllBytesAsync(file)).AsSpan().SequenceEqual(pending.Before)) throw new InvalidDataException("セーブのバックアップが一致しません。");

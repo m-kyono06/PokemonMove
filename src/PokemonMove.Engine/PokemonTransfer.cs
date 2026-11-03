@@ -9,7 +9,7 @@ public sealed class PokemonTransfer
     public PokemonTransferPlan Prepare(PokemonSummary pokemon, string targetFormat, DateOnly? transferDate = null, TransferTrainerProfile? trainer = null)
     {
         var source = new PokemonCodec().Decode(pokemon.StoredData, pokemon.FormatKey);
-        if (targetFormat == "xy") return PrepareXY(source, trainer);
+        if (targetFormat is "xy" or "oras") return PrepareGen6(source, trainer);
         if (source.FormatKey == "pk6") throw new InvalidDataException("第6世代の個体をDS作品へ戻すことはできません。個体はバンクに残っています。");
         var target5 = targetFormat is "bw" or "b2w2";
         if (!target5 && targetFormat is not ("dp" or "pt" or "hgss"))
@@ -44,13 +44,13 @@ public sealed class PokemonTransfer
         if (pk4.Gender != pk5.Gender) notices.Add("性別情報を第5世代に合わせて補正します。");
         return new(converted, true, notices);
     }
-    private static PokemonTransferPlan PrepareXY(PokemonSummary source, TransferTrainerProfile? trainer)
+    private static PokemonTransferPlan PrepareGen6(PokemonSummary source, TransferTrainerProfile? trainer)
     {
         if (source.FormatKey == "pk6") return new(source, false, []);
         if (source.FormatKey != "pk5")
-            throw new InvalidDataException("第4世代からXYへ直接は移動できません。先にBW・BW2へ移動してください。");
+            throw new InvalidDataException("第4世代からXY・ORASへ直接は移動できません。先にBW・BW2へ移動してください。");
         if (trainer is null || string.IsNullOrWhiteSpace(trainer.Name))
-            throw new InvalidDataException("移動先のトレーナー情報を確認できません。XYのセーブを選び直してください。");
+            throw new InvalidDataException("移動先のトレーナー情報を確認できません。XY・ORASのセーブを選び直してください。");
         var pk5 = new PK5(source.StoredData.ToArray());
         if (pk5.IsEgg) throw new InvalidDataException("タマゴは第6世代へ移動できません。ゲーム内で孵化させてください。");
         if (pk5.HeldItem != 0) throw new InvalidDataException("第6世代へ移動する前に、BW・BW2のゲーム内で持ち物を外してください。");
