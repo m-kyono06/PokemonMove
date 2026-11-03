@@ -243,5 +243,25 @@ public sealed class TransferTests : IDisposable
         public Task WriteAsync(byte[] data) { Writes++; return Task.CompletedTask; }
     }
 
+    [Fact]
+    public async Task CollectionTracksOwnershipAsPokemonMovesBetweenSaveAndBank()
+    {
+        var file = new File(); var bank = Bank(); var dex = new HgssCollectionDex();
+        var before = dex.Build(View(file.Data), await bank.ListAsync());
+        var count = before.Owned(DexVariant.All);
+        Assert.Equal(1, before.Entries[151].BoxCount);
+        await bank.MoveIntoBankAsync(file, Box, Hash(file.Data));
+        var stored = Assert.Single(await bank.ListAsync());
+        var deposited = dex.Build(View(file.Data), await bank.ListAsync());
+        Assert.Equal(count, deposited.Owned(DexVariant.All));
+        Assert.Equal(0, deposited.Entries[151].BoxCount);
+        Assert.Equal(1, deposited.Entries[151].BankCount);
+        await bank.MoveToSaveAsync(stored.Entry.Id, file, Box, Hash(file.Data));
+        var withdrawn = dex.Build(View(file.Data), await bank.ListAsync());
+        Assert.Equal(count, withdrawn.Owned(DexVariant.All));
+        Assert.Equal(1, withdrawn.Entries[151].BoxCount);
+        Assert.Equal(0, withdrawn.Entries[151].BankCount);
+    }
+
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

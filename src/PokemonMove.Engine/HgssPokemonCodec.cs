@@ -34,6 +34,6 @@ public sealed class HgssPokemonCodec : IPokemonCodec
         return new(slot, p.Species, At(strings.specieslist, p.Species), p.Nickname,
             p.CurrentLevel, string.Join(" / ", types),
             new[] { p.Move1, p.Move2, p.Move3, p.Move4 }.Where(m => m != 0)
-                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data };
+                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data, IsEgg = p.IsEgg };
     }
 }

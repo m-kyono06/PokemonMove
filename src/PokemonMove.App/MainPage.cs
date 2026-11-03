@@ -12,6 +12,7 @@ public sealed class MainPage : ContentPage
     private bool storing;
     private bool loading;
     private readonly ISaveDocuments documents;
+    private readonly ICollectionDex dex;
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
     private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っているHGSSのセーブを選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
@@ -19,11 +20,12 @@ public sealed class MainPage : ContentPage
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
 
-    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents)
+    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex)
     {
         this.reader = reader;
         this.bank = bank;
         this.documents = documents;
+        this.dex = dex;
         Title = "PokemonMove";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -33,6 +35,12 @@ public sealed class MainPage : ContentPage
         location.IsVisible = false;
         var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
         bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader));
+        var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
+        dexButton.Clicked += async (_, _) =>
+        {
+            if (loading || storing) return;
+            await Navigation.PushAsync(new CollectionPage(bank, reader, dex, sourceDocument));
+        };
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
@@ -43,7 +51,7 @@ public sealed class MainPage : ContentPage
                     new Label { Text = "POKEMON MOVE", FontSize = 13, CharacterSpacing = 3, TextColor = Color.FromArgb("61DFC0") },
                     new Label { Text = "冒険の仲間を、ひとつに。", FontSize = 26, FontAttributes = FontAttributes.Bold, TextColor = Colors.White },
                     new Label { Text = "ハートゴールド / ソウルシルバー", TextColor = Color.FromArgb("AFC2CD") },
-                    open, bankButton, status, location, slots,
+                    open, bankButton, dexButton, status, location, slots,
                     new Label { Text = "移動前にエミュレータを終了してください。選択したセーブを書き換えます。別のコピーを選ぶと、エミュレータ側の元データは変わりません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\n保管時は元の枠から取り除き、引き出し時はバンクから取り除きます。バックアップはバンク画面から書き出せます。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
                 }
             }

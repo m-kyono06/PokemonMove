@@ -13,6 +13,7 @@ public static class MauiProgram
     private static MauiAppBuilder ConfigureServices(this MauiAppBuilder builder)
     {
         builder.Services.AddSingleton<ISaveReader, HgssSaveReader>();
+        builder.Services.AddSingleton<ICollectionDex, HgssCollectionDex>();
         builder.Services.AddSingleton<IPokemonCodec, HgssPokemonCodec>();
         builder.Services.AddSingleton<IBankStore>(services => new LocalBankStore(
             Path.Combine(FileSystem.AppDataDirectory, "bank"), services.GetRequiredService<IPokemonCodec>(), new HgssSaveEditor()));
