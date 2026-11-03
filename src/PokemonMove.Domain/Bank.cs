@@ -1,7 +1,10 @@
 namespace PokemonMove.Domain;
 
 public sealed record BankEntry(Guid Id, string SourceGame, string SourceTrainer,
-    DateTimeOffset StoredAt, byte[] Data);
+    DateTimeOffset StoredAt, byte[] Data)
+{
+    public bool TransferEligible { get; init; }
+}
 public sealed record BankItem(BankEntry Entry, PokemonSummary Pokemon);
 public sealed record BankAddResult(BankItem Item, bool Added);
 public interface IPokemonCodec
@@ -15,4 +18,9 @@ public interface IBankStore
     Task<byte[]> ExportAsync();
     Task<int> ImportAsync(byte[] backup);
     Task RestorePreviousAsync();
+    Task MoveIntoBankAsync(ISaveDocument source, PokemonLocation location, byte[] expectedHash);
+    Task MoveToSaveAsync(Guid entryId, ISaveDocument target, PokemonLocation location, byte[] expectedHash);
+    Task RecoverMoveAsync(ISaveDocument document, bool restoreOriginal = false);
+    Task<bool> HasPendingMoveAsync();
+    Task<SaveBackup> LastSaveBackupAsync();
 }

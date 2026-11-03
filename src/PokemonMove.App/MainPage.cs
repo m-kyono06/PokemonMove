@@ -1,5 +1,6 @@
 using PokemonMove.Domain;
 using PokemonMove.Engine;
+using System.Security.Cryptography;
 
 namespace PokemonMove.App;
 
@@ -9,15 +10,20 @@ public sealed class MainPage : ContentPage
     private SaveSnapshot? snapshot;
     private readonly IBankStore bank;
     private bool storing;
-    private readonly Label status = new() { Text = "HGSS のセーブを開いて、冒険の仲間を確認しましょう。", TextColor = Color.FromArgb("AFC2CD") };
+    private bool loading;
+    private readonly ISaveDocuments documents;
+    private ISaveDocument? sourceDocument;
+    private byte[] sourceHash = [];
+    private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っているHGSSのセーブを選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
     private readonly Picker location = new() { Title = "手持ち / ボックス", TextColor = Colors.White, BackgroundColor = Color.FromArgb("233E4B") };
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
 
-    public MainPage(ISaveReader reader, IBankStore bank)
+    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents)
     {
         this.reader = reader;
         this.bank = bank;
+        this.documents = documents;
         Title = "PokemonMove";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -26,7 +32,7 @@ public sealed class MainPage : ContentPage
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
         var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
-        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank));
+        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader));
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
@@ -38,7 +44,7 @@ public sealed class MainPage : ContentPage
                     new Label { Text = "冒険の仲間を、ひとつに。", FontSize = 26, FontAttributes = FontAttributes.Bold, TextColor = Colors.White },
                     new Label { Text = "ハートゴールド / ソウルシルバー", TextColor = Color.FromArgb("AFC2CD") },
                     open, bankButton, status, location, slots,
-                    new Label { Text = "ポケモンの詳細からバンクへコピーして保管できます。元のセーブは変更しません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\nゲームへの引き出し・移動・収集図鑑は今後追加予定です。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
+                    new Label { Text = "移動前にエミュレータを終了してください。選択したセーブを書き換えます。別のコピーを選ぶと、エミュレータ側の元データは変わりません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\n保管時は元の枠から取り除き、引き出し時はバンクから取り除きます。バックアップはバンク画面から書き出せます。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
                 }
             }
         };
@@ -46,24 +52,19 @@ public sealed class MainPage : ContentPage
 
     private async void OpenSave(object? sender, EventArgs e)
     {
+        if (loading || storing) return;
+        loading = true;
         open.IsEnabled = false;
+        slots.IsEnabled = false;
         try
         {
-            var file = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "HGSS の通常セーブを選択" });
+            var file = await documents.PickAsync();
             if (file is null) return;
             status.Text = "セーブを読み込み中…";
-            await using var stream = await file.OpenReadAsync();
-            using var memory = new MemoryStream();
-            // Limit reads even when the document provider reports no length.
-            var buffer = new byte[8192];
-            int count;
-            while ((count = await stream.ReadAsync(buffer)) != 0)
-            {
-                if (memory.Length + count > HgssSaveReader.MaximumFileSize)
-                    throw new InvalidDataException("ファイルが大きすぎます。HGSSの通常セーブを選択してください。");
-                memory.Write(buffer, 0, count);
-            }
-            var loaded = await Task.Run(() => reader.Read(memory.ToArray()));
+            var data = await file.ReadAsync();
+            var loaded = await Task.Run(() => reader.Read(data));
+            sourceDocument = file;
+            sourceHash = SHA256.HashData(data);
             snapshot = loaded;
             location.Items.Clear();
             location.Items.Add($"手持ち（{loaded.Party.Count}匹）");
@@ -78,14 +79,36 @@ public sealed class MainPage : ContentPage
             status.Text = snapshot is null ? "セーブを開けませんでした。別のファイルをお試しください。" : $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}（前のセーブを表示中）";
             await DisplayAlertAsync("読み込みできませんでした", ex is InvalidDataException ? ex.Message : "ファイルの内容またはアクセス権限を確認してください。", "閉じる");
         }
-        finally { open.IsEnabled = true; }
+        finally { loading = false; open.IsEnabled = true; slots.IsEnabled = true; }
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        if (sourceDocument is null || storing || loading) return;
+        loading = true;
+        open.IsEnabled = false;
+        slots.IsEnabled = false;
+        try
+        {
+            var data = await sourceDocument.ReadAsync();
+            snapshot = await Task.Run(() => reader.Read(data));
+            sourceHash = SHA256.HashData(data);
+            status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}" + (snapshot.Warnings.Count == 0 ? "" : "\n" + string.Join("\n", snapshot.Warnings));
+            if (location.Items.Count > 0) location.Items[0] = $"手持ち（{snapshot.Party.Count}匹）";
+            RenderSlots();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        { status.Text = "セーブを再読み込みできません。開き直すか、中断した移動をバンク画面で復旧してください。"; }
+        finally { loading = false; open.IsEnabled = true; slots.IsEnabled = true; }
     }
 
     private void RenderSlots()
     {
         slots.Children.Clear();
         if (snapshot is null || location.SelectedIndex < 0) return;
-        var pokemon = location.SelectedIndex == 0 ? snapshot.Party : snapshot.Boxes[location.SelectedIndex - 1].Slots;
+        var selectedLocation = location.SelectedIndex;
+        var pokemon = selectedLocation == 0 ? snapshot.Party : snapshot.Boxes[selectedLocation - 1].Slots;
         foreach (var p in pokemon)
         {
             var button = new Button
@@ -94,16 +117,17 @@ public sealed class MainPage : ContentPage
                 BackgroundColor = Color.FromArgb(p.Species == 0 ? "1C333E" : "294D59"), TextColor = Colors.White,
                 CornerRadius = 8, IsEnabled = p.Species != 0,
             };
-            button.Clicked += async (_, _) => await ShowPokemon(p);
+            button.Clicked += async (_, _) => await ShowPokemon(p, new PokemonLocation(selectedLocation == 0, selectedLocation - 1, p.Slot));
             slots.Add(button, p.Slot % 6, p.Slot / 6);
         }
     }
 
-    private async Task ShowPokemon(PokemonSummary pokemon)
+    private async Task ShowPokemon(PokemonSummary pokemon, PokemonLocation position)
     {
-        if (storing || snapshot is null) return;
+        if (storing || loading || snapshot is null || sourceDocument is null) return;
         storing = true;
-        var source = snapshot;
+        open.IsEnabled = false;
+        slots.IsEnabled = false;
         try
         {
             var detail = BankPage.Detail(pokemon);
@@ -112,15 +136,21 @@ public sealed class MainPage : ContentPage
                 await DisplayAlertAsync(pokemon.Name, detail + "\n\nデータ検証に失敗したため保管できません。", "閉じる");
                 return;
             }
-            if (!await DisplayAlertAsync(pokemon.Name, detail + "\n\n元のセーブを変更せず、バンクへコピーします。", "バンクにコピーして保管", "閉じる")) return;
-            var result = await bank.AddAsync(pokemon, source.Game, source.TrainerName);
-            await DisplayAlertAsync("ローカルバンク", result.Added ? "保管しました。バンク画面から確認できます。" : "同じデータのポケモンはすでに保管されています。", "閉じる");
+            if (!await DisplayAlertAsync(pokemon.Name, detail + "\n\nエミュレータを終了してください。バックアップ後、選択したセーブから取り除いてバンクへ移動します。", "バンクへ移動", "閉じる")) return;
+            await bank.MoveIntoBankAsync(sourceDocument, position, sourceHash);
+            var updated = await sourceDocument.ReadAsync();
+            snapshot = await Task.Run(() => reader.Read(updated));
+            sourceHash = SHA256.HashData(updated);
+            status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}\n移動後のセーブを表示中";
+            if (location.Items.Count > 0) location.Items[0] = $"手持ち（{snapshot.Party.Count}匹）";
+            RenderSlots();
+            await DisplayAlertAsync("移動完了", "セーブから取り除き、バンクに保管しました。移動前のセーブはバックアップされています。", "閉じる");
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
-            await DisplayAlertAsync("保管できませんでした", ex is InvalidDataException ? ex.Message : "保存先へのアクセスを確認してください。元のセーブは変更していません。", "閉じる");
+            await DisplayAlertAsync("保管できませんでした", ex is InvalidDataException ? ex.Message : "保存先へのアクセスを確認してください。中断した可能性があります。バンク画面で復旧を確認してください。", "閉じる");
         }
-        finally { storing = false; }
+        finally { storing = false; open.IsEnabled = true; slots.IsEnabled = true; }
     }
 
 }

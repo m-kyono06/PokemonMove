@@ -85,7 +85,7 @@ public sealed class LocalBankStoreTests : IDisposable
     [Theory]
     [InlineData("not json")]
     [InlineData("null")]
-    [InlineData("{\"Version\":2,\"Entries\":[]}")]
+    [InlineData("{\"Version\":999,\"Entries\":[]}")]
     [InlineData("{\"Version\":1,\"Entries\":[null]}")]
     public async Task InvalidImportPreservesExistingBank(string input)
     {
