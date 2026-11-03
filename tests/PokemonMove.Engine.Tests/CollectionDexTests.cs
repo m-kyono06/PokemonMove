@@ -7,12 +7,12 @@ namespace PokemonMove.Engine.Tests;
 
 public sealed class CollectionDexTests
 {
-    private readonly HgssCollectionDex dex = new();
+    private readonly Gen4CollectionDex dex = new();
     private static PokemonSummary Pokemon(ushort species, bool shiny = false, bool egg = false)
     {
         var pk = new PK4 { Species = species, CurrentLevel = 12, ID32 = 0, PID = shiny ? 0u : 0x100000u, IsEgg = egg };
         var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
-        return new HgssPokemonCodec().Decode(data);
+        return new Gen4PokemonCodec().Decode(data);
     }
     private static BankItem Bank(PokemonSummary p) => new(new(Guid.NewGuid(), "SS", "TEST", DateTimeOffset.UtcNow, p.StoredData), p);
     private static SaveSnapshot Save(PokemonSummary[] party, params PokemonSummary[] box) => new("TEST", "SS", party, [new("BOX", box)]);

@@ -9,7 +9,7 @@ namespace PokemonMove.Infrastructure.Tests;
 public sealed class LocalBankStoreTests : IDisposable
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), "PokemonMove-bank-tests-" + Guid.NewGuid());
-    private readonly HgssPokemonCodec codec = new();
+    private readonly Gen4PokemonCodec codec = new();
     private LocalBankStore Store() => new(directory, codec);
     private PokemonSummary Pokemon(ushort species = 152)
     {

@@ -14,7 +14,7 @@ public sealed class InspectionTests
             IV_HP = 31, IV_ATK = 31, IV_DEF = 31, IV_SPA = 31, IV_SPD = 31, IV_SPE = 31 };
         var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
         var before = data.ToArray();
-        var summary = new HgssPokemonCodec().Decode(data);
+        var summary = new Gen4PokemonCodec().Decode(data);
         var details = Assert.IsType<PokemonDetails>(summary.Details);
         Assert.Equal(new PokemonBattleStats(120, 69, 85, 69, 85, 65), details.Stats);
         Assert.Null(details.CurrentHP); // Box entities have no current battle HP.
@@ -32,7 +32,7 @@ public sealed class InspectionTests
             IV_HP = 31, IV_ATK = 30, IV_DEF = 0, IV_SPA = 31, IV_SPD = 15, IV_SPE = 1 };
         var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
         var before = data.ToArray();
-        var summary = new HgssPokemonCodec().Decode(data);
+        var summary = new Gen4PokemonCodec().Decode(data);
         var d = Assert.IsType<PokemonDetails>(summary.Details);
         Assert.Equal(new PokemonBattleStats(6, 252, 0, 1, 2, 249), d.EffortValues);
         Assert.Equal(new PokemonBattleStats(31, 30, 0, 31, 15, 1), d.IndividualValues);
@@ -53,7 +53,7 @@ public sealed class InspectionTests
         var pk = new PK4 { Species = 25, CurrentLevel = 10, TID16 = 65535,
             IV_HP = iv, IV_ATK = iv, IV_DEF = iv, IV_SPA = iv, IV_SPD = iv, IV_SPE = iv };
         var data = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(data);
-        var d = Assert.IsType<PokemonDetails>(new HgssPokemonCodec().Decode(data).Details);
+        var d = Assert.IsType<PokemonDetails>(new Gen4PokemonCodec().Decode(data).Details);
         Assert.Equal(expected, d.PerfectIVCount);
         Assert.Equal(0, d.TotalEffortValues);
         Assert.Equal("65535", d.OriginalTrainerId.ToString("D5"));

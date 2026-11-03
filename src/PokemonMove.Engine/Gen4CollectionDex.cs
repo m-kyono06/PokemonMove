@@ -4,8 +4,8 @@ using PokemonMove.Domain;
 
 namespace PokemonMove.Engine;
 
-/// <summary>Current ownership, not the game's seen/caught flags. All HGSS national species (1..493).</summary>
-public sealed class HgssCollectionDex : ICollectionDex
+/// <summary>Current ownership, not the game's seen/caught flags. All Generation 4 national species (1..493).</summary>
+public sealed class Gen4CollectionDex : ICollectionDex
 {
     public CollectionDexSnapshot Build(SaveSnapshot? save, IReadOnlyList<BankItem> bank)
         => BuildAll(save is null ? [] : [save], bank);

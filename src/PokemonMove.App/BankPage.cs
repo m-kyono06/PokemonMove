@@ -99,7 +99,7 @@ public sealed class BankPage : ContentPage
             Children =
             {
                 status, search, box, slots, selected, withdraw,
-                new Label { Text = "移動保管した個体は、保管元を含むHGSSセーブのボックスへ引き出せます。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
+                new Label { Text = "移動保管した個体は、保管元を含むD・P・Pt・HGSSセーブのボックスへ引き出せます。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
         }};

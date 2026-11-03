@@ -2,7 +2,7 @@
 
 - [PKHeX.Core](https://github.com/kwsch/PKHeX), version 26.10.18:
   Copyright © Kaphotics and contributors. GPL-3.0-or-later.
-  Used for HGSS save parsing and Japanese game text. Restored from NuGet;
+  Used for Generation 4 save parsing and Japanese game text. Restored from NuGet;
   no PKForge source or artwork is copied into this project.
 - Microsoft .NET MAUI: MIT license.
 - xUnit.net (tests): Apache-2.0 license.

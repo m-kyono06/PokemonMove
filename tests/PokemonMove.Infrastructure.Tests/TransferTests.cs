@@ -11,14 +11,14 @@ namespace PokemonMove.Infrastructure.Tests;
 public sealed class TransferTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "PokemonMove-transfer-tests-" + Guid.NewGuid());
-    private LocalBankStore Bank() => new(root, new HgssPokemonCodec(), new HgssSaveEditor());
+    private LocalBankStore Bank() => new(root, new Gen4PokemonCodec(), new Gen4SaveEditor());
     private static readonly PokemonLocation Box = new(false, 0, 0);
     private static byte[] Hash(byte[] bytes) => SHA256.HashData(bytes);
-    private static SaveSnapshot View(byte[] data) => new HgssSaveReader().Read(data);
+    private static SaveSnapshot View(byte[] data) => new Gen4SaveReader().Read(data);
 
     private static byte[] Save(bool dsv = false, bool optionalDamage = false)
     {
-        var save = new SAV4HGSS(new byte[HgssSaveReader.RawSize]) { Version = GameVersion.SS, OT = "TEST" };
+        var save = new SAV4HGSS(new byte[Gen4SaveReader.RawSize]) { Version = GameVersion.SS, OT = "TEST" };
         save.Magic = SAV4.MAGIC_JAPAN_INTL;
         foreach (var partition in new[] { 0, 0x40000 })
             BinaryPrimitives.WriteInt32LittleEndian(save.Data.Slice(partition + SAV4HGSS.GeneralSize - 0xC, 4), SAV4HGSS.GeneralSize);
@@ -73,7 +73,7 @@ public sealed class TransferTests : IDisposable
         Assert.Equal(original, (await bank.LastSaveBackupAsync()).Data);
         // Unused extra blocks and the DSV footer remain byte-for-byte unchanged.
         Assert.Equal(original[0x23000..0x40000], file.Data[0x23000..0x40000]);
-        Assert.Equal(original[HgssSaveReader.RawSize..], file.Data[HgssSaveReader.RawSize..]);
+        Assert.Equal(original[Gen4SaveReader.RawSize..], file.Data[Gen4SaveReader.RawSize..]);
         Assert.Single(View(file.Data).Warnings);
         var backup = await bank.ExportAsync();
         await bank.MoveToSaveAsync(stored.Entry.Id, file, Box, Hash(file.Data));
@@ -246,7 +246,7 @@ public sealed class TransferTests : IDisposable
     [Fact]
     public async Task CollectionTracksOwnershipAsPokemonMovesBetweenSaveAndBank()
     {
-        var file = new File(); var bank = Bank(); var dex = new HgssCollectionDex();
+        var file = new File(); var bank = Bank(); var dex = new Gen4CollectionDex();
         var before = dex.Build(View(file.Data), await bank.ListAsync());
         var count = before.Owned(DexVariant.All);
         Assert.Equal(1, before.Entries[151].BoxCount);

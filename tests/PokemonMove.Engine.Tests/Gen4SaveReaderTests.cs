@@ -4,13 +4,13 @@ using Xunit;
 
 namespace PokemonMove.Engine.Tests;
 
-public class HgssSaveReaderTests
+public class Gen4SaveReaderTests
 {
     // Use full-size memory: PKHeX's parameterless blank Gen4 saves do not
     // allocate the optional extra blocks needed by its checksum writer.
     private static SAV4HGSS CreateSave(GameVersion version)
     {
-        var save = new SAV4HGSS(new byte[HgssSaveReader.RawSize]);
+        var save = new SAV4HGSS(new byte[Gen4SaveReader.RawSize]);
         save.Version = version;
         save.Language = (int)LanguageID.Japanese;
         save.Magic = SAV4.MAGIC_JAPAN_INTL;
@@ -38,7 +38,7 @@ public class HgssSaveReaderTests
         save.SetBoxName(17, "さいご");
         var bytes = save.Write().ToArray();
         var original = bytes.ToArray();
-        var result = new HgssSaveReader().Read(bytes);
+        var result = new Gen4SaveReader().Read(bytes);
         Assert.Equal(original, bytes);
         Assert.Equal(title, result.Game);
         Assert.Empty(result.Warnings);
@@ -66,7 +66,7 @@ public class HgssSaveReaderTests
         raw.CopyTo(dsv, 0);
         "|-DESMUME SAVE-|"u8.CopyTo(dsv.AsSpan(dsv.Length - "|-DESMUME SAVE-|"u8.Length));
         var original = dsv.ToArray();
-        var result = new HgssSaveReader().Read(dsv);
+        var result = new Gen4SaveReader().Read(dsv);
         Assert.Equal(18, result.Boxes.Count);
         Assert.Equal(original, dsv);
     }
@@ -74,19 +74,17 @@ public class HgssSaveReaderTests
     [Fact]
     public void RejectsAnotherDsGame()
     {
-        var save = new SAV4Pt(new byte[HgssSaveReader.RawSize]);
-        save.Magic = SAV4.MAGIC_JAPAN_INTL;
-        InitializeGeneralFooter(save, SAV4Pt.GeneralSize);
-        Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(save.Write().ToArray()));
+        var save = new SAV5BW();
+        Assert.Throws<InvalidDataException>(() => new Gen4SaveReader().Read(save.Write().ToArray()));
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(100)]
-    [InlineData(HgssSaveReader.RawSize)]
-    [InlineData(HgssSaveReader.MaximumFileSize + 1)]
+    [InlineData(Gen4SaveReader.RawSize)]
+    [InlineData(Gen4SaveReader.MaximumFileSize + 1)]
     public void RejectsInvalidData(int size) =>
-        Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(new byte[size]));
+        Assert.Throws<InvalidDataException>(() => new Gen4SaveReader().Read(new byte[size]));
 
     [Fact]
     public void RejectsDamagedSave()
@@ -94,7 +92,7 @@ public class HgssSaveReaderTests
         var save = CreateSave(GameVersion.HG);
         var bytes = save.Write().ToArray();
         bytes[0x100] ^= 0xFF;
-        Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(bytes));
+        Assert.Throws<InvalidDataException>(() => new Gen4SaveReader().Read(bytes));
     }
 
     [Theory]
@@ -116,7 +114,7 @@ public class HgssSaveReaderTests
             "|-DESMUME SAVE-|"u8.CopyTo(data.AsSpan(data.Length - "|-DESMUME SAVE-|"u8.Length));
         }
         var before = data.ToArray();
-        var result = new HgssSaveReader().Read(data);
+        var result = new Gen4SaveReader().Read(data);
         Assert.Equal("コトネ", result.TrainerName);
         Assert.Equal((ushort)158, Assert.Single(result.Party).Species);
         Assert.Single(result.Warnings);
@@ -136,7 +134,7 @@ public class HgssSaveReaderTests
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
             bytes.AsSpan(partition * 0x40000 + start + size - 0x14, 4), 10);
         bytes[partition * 0x40000 + start + 0x100] ^= 0xFF;
-        var error = Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(bytes));
+        var error = Assert.Throws<InvalidDataException>(() => new Gen4SaveReader().Read(bytes));
         Assert.Contains(start == 0 ? "主人公・手持ち" : "ボックス", error.Message);
     }
 
@@ -159,7 +157,7 @@ public class HgssSaveReaderTests
             System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(block[^2..],
                 Checksums.CRC16_CCITT(block[..^0x10]));
         }
-        var result = new HgssSaveReader().Read(bytes);
+        var result = new Gen4SaveReader().Read(bytes);
         Assert.Equal("ソウルシルバー", result.Game);
         Assert.Empty(result.Warnings);
     }

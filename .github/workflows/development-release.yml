@@ -30,7 +30,7 @@ jobs:
         run: |
           dotnet workload install maui-android --skip-manifest-update
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
-      - name: Test HGSS reader
+      - name: Test Generation 4 reader and editor
         run: dotnet test tests/PokemonMove.Engine.Tests/PokemonMove.Engine.Tests.csproj
       - name: Test bank persistence
         run: dotnet test tests/PokemonMove.Infrastructure.Tests/PokemonMove.Infrastructure.Tests.csproj
@@ -63,7 +63,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "PokemonMove $TAG — HGSS 開発版" --notes-file "docs/releases/$TAG.md" --prerelease --draft
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "PokemonMove $TAG — DS第4世代 開発版" --notes-file "docs/releases/$TAG.md" --prerelease --draft
           fi
           gh release view "$TAG" --json isDraft --jq '.isDraft' | grep -qx true
           gh release upload "$TAG" dist/* --clobber
