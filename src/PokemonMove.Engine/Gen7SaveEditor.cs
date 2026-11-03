@@ -38,9 +38,9 @@ public sealed class Gen7SaveEditor : ISaveEditor
         if (location.Box >= save.BoxesUnlocked) throw new InvalidDataException("ゲーム内で開放済みのボックスを選択してください。");
         if (save.GetBoxSlotAtIndex(location.Box, location.Slot).Species != 0) throw new InvalidDataException("引き出し先の枠は空いていません。");
         var original = new PokemonCodec().Decode(pokemon, formatKey);
-        var plan = new PokemonTransfer().Prepare(original, "sm", transferDate, Gen7SaveReader.Profile(save));
+        var plan = new PokemonTransfer().Prepare(original, Gen7SaveReader.Format(save), transferDate, Gen7SaveReader.Profile(save));
         var pk = new PK7(plan.Pokemon.StoredData.ToArray()); ValidateMovable(pk);
-        if (!save.Personal.IsPresentInGame(pk.Species, pk.Form))
+        if (pk.Species > save.MaxSpeciesID || !save.Personal.IsPresentInGame(pk.Species, pk.Form))
             throw new InvalidDataException("このフォルムは移動先の作品に対応していません。対応する作品へ引き出してください。");
         if (pk.HeldItem != 0 && (pk.HeldItem > save.MaxItemID || !save.HeldItems.Contains((ushort)pk.HeldItem)))
             throw new InvalidDataException("この持ち物は移動先の作品に対応していません。");
@@ -55,13 +55,13 @@ public sealed class Gen7SaveEditor : ISaveEditor
         save.SetBoxSlotAtIndex(pk, location.Box, location.Slot, EntityImportSettings.None);
         return new(Finish(save, location), original, Gen7SaveReader.Title(save), save.OT);
     }
-    private static SAV7SM Open(byte[] data)
+    private static SAV7 Open(byte[] data)
     {
         var save = Gen7SaveReader.Open(data);
         if (save.PartyCount is < 1 or > 6) throw new InvalidDataException("手持ちの数が不正です。");
         return save;
     }
-    private static void ValidateLocation(SAV7SM save, PokemonLocation p)
+    private static void ValidateLocation(SAV7 save, PokemonLocation p)
     {
         if (p.IsParty ? p.Slot < 0 || p.Slot >= save.PartyCount : p.Box < 0 || p.Box >= save.BoxCount || p.Slot < 0 || p.Slot >= save.BoxSlotCount)
             throw new InvalidDataException("選択した枠が見つかりません。セーブを開き直してください。");
@@ -72,12 +72,14 @@ public sealed class Gen7SaveEditor : ISaveEditor
     {
         if (pk.Species == (ushort)Species.Kyurem && pk.Form != 0)
             throw new InvalidDataException("合体中のキュレムは移動できません。ゲーム内で分離してください。");
+        if (pk.Species == (ushort)Species.Necrozma && pk.Form != 0)
+            throw new InvalidDataException("合体中・ウルトラバースト中のネクロズマは移動できません。ゲーム内で通常の姿に戻してください。");
         if (pk.Species == (ushort)Species.Furfrou && pk.Form != 0)
             throw new InvalidDataException("トリミング中のトリミアンは、ゲーム内で通常の姿に戻してから移動してください。");
         if (FormInfo.IsBattleOnlyForm(pk.Species, pk.Form, 7))
             throw new InvalidDataException("戦闘中だけのフォルムは移動できません。ゲーム内で通常の姿に戻してください。");
     }
-    private static byte[] Finish(SAV7SM save, PokemonLocation p)
+    private static byte[] Finish(SAV7 save, PokemonLocation p)
     {
         // Preserve all other blocks and battle-team assignments. Only update this block CRC and the save signature.
         BlockInfo.SetChecksums([save.AllBlocks[p.IsParty ? 4 : 14]], save.Data);

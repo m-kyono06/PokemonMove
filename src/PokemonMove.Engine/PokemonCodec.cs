@@ -24,7 +24,7 @@ public sealed class PokemonCodec : IPokemonCodec
         var types = new[] { At(strings.types, personal.Type1), At(strings.types, personal.Type2) }.Distinct();
         var data = Array.Empty<byte>();
         // Check before writing: PKHeX refreshes the entity checksum during serialization.
-        if (p.Species <= (p.Format switch { 7 => 802, 6 => 721, 5 => 649, _ => 493 }) && p.ChecksumValid)
+        if (p.Species <= (p.Format switch { 7 => 807, 6 => 721, 5 => 649, _ => 493 }) && p.ChecksumValid)
         {
             data = new byte[p.SIZE_STORED];
             p.WriteEncryptedDataStored(data);

@@ -31,13 +31,13 @@ public sealed class Gen7BankTests : IDisposable
             return Task.CompletedTask;
         }
     }
-    public static IEnumerable<object[]> Pairs=>from a in new[]{GameVersion.SN,GameVersion.MN} from b in new[]{GameVersion.SN,GameVersion.MN} select new object[]{a,b};
+    public static IEnumerable<object[]> Pairs=>from a in new[]{GameVersion.SN,GameVersion.MN,GameVersion.US,GameVersion.UM} from b in new[]{GameVersion.SN,GameVersion.MN,GameVersion.US,GameVersion.UM} select new object[]{a,b};
     public static IEnumerable<object[]> ForwardPairs=>from a in new[]{GameVersion.X,GameVersion.Y,GameVersion.OR,GameVersion.AS}
-        from b in new[]{GameVersion.SN,GameVersion.MN} select new object[]{a,b};
+        from b in new[]{GameVersion.SN,GameVersion.MN,GameVersion.US,GameVersion.UM} select new object[]{a,b};
 
     [Theory]
     [MemberData(nameof(Pairs))]
-    public async Task SunMoonMovesConsumeEntryPreserveExactPokemonAndMaintainCollection(GameVersion a,GameVersion b)
+    public async Task Gen7MovesConsumeEntryPreserveExactPokemonAndMaintainCollection(GameVersion a,GameVersion b)
     {
         var source=new Document("source",Gen7Fixtures.Create(a));
         var target=new Document("target",Gen7Fixtures.Create(b,boxPokemon:new PK7{Species=802,PID=987,EncryptionConstant=123,CurrentLevel=30}));
@@ -62,12 +62,12 @@ public sealed class Gen7BankTests : IDisposable
 
     [Theory]
     [MemberData(nameof(ForwardPairs))]
-    public async Task Gen6MovesToEitherSMGameAndCannotReturn(GameVersion a,GameVersion b)
+    public async Task Gen6MovesToAnyGen7GameAndCannotReturn(GameVersion a,GameVersion b)
     {
         var source=new Document("old",Gen6Fixtures.Create(a));var target=new Document("sm",Gen7Fixtures.Create(b));
         await Bank().MoveIntoBankAsync(source,new(false,30,29),Hash(source.Data));
         var entry=Assert.Single(await Bank().ListAsync());var backup=await Bank().ExportAsync();
-        var plan=new PokemonTransfer().Prepare(entry.Pokemon,"sm",trainer:View(target.Data).TransferTrainer);
+        var plan=new PokemonTransfer().Prepare(entry.Pokemon,View(target.Data).FormatKey,trainer:View(target.Data).TransferTrainer);
         await Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data));
         Assert.Empty(await Bank().ListAsync());Assert.Equal(0,await Bank().ImportAsync(backup));
         var moved=View(target.Data).Boxes[0].Slots[0];Assert.Equal("pk7",moved.FormatKey);Assert.Equal(plan.Pokemon.StoredData,moved.StoredData);
@@ -78,14 +78,20 @@ public sealed class Gen7BankTests : IDisposable
     }
 
     [Theory]
-    [InlineData("before")]
-    [InlineData("after")]
-    [InlineData("partial")]
-    public async Task InterruptedForwardMoveCanReproduceSignatureAndRecoverWithoutDuplicate(string failure)
+    [InlineData("before",GameVersion.SN)]
+    [InlineData("after",GameVersion.SN)]
+    [InlineData("partial",GameVersion.SN)]
+    [InlineData("before",GameVersion.US)]
+    [InlineData("after",GameVersion.US)]
+    [InlineData("partial",GameVersion.US)]
+    [InlineData("before",GameVersion.UM)]
+    [InlineData("after",GameVersion.UM)]
+    [InlineData("partial",GameVersion.UM)]
+    public async Task InterruptedForwardMoveCanReproduceSignatureAndRecoverWithoutDuplicate(string failure,GameVersion targetVersion)
     {
-        var source=new Document("oras",Gen6Fixtures.Create(GameVersion.OR));var target=new Document("sm",Gen7Fixtures.Create(GameVersion.SN));
+        var source=new Document("oras",Gen6Fixtures.Create(GameVersion.OR));var target=new Document("sm",Gen7Fixtures.Create(targetVersion));
         var original=target.Data.ToArray();await Bank().MoveIntoBankAsync(source,new(false,30,29),Hash(source.Data));var entry=Assert.Single(await Bank().ListAsync());
-        var plan=new PokemonTransfer().Prepare(entry.Pokemon,"sm",trainer:View(target.Data).TransferTrainer);
+        var plan=new PokemonTransfer().Prepare(entry.Pokemon,View(target.Data).FormatKey,trainer:View(target.Data).TransferTrainer);
         target.Failure=failure;
         await Assert.ThrowsAsync<IOException>(()=>Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data)));
         RecentTrainerCache.SetRecentTrainer(new SimpleTrainerInfo(GameVersion.MN){OT="違うトレーナー",Gender=1});
@@ -126,6 +132,21 @@ public sealed class Gen7BankTests : IDisposable
         var source=new Document("sm",Gen7Fixtures.Create(GameVersion.SN,registered:condition=="team",resort:condition=="resort"));var before=source.Data.ToArray();
         await Assert.ThrowsAsync<InvalidDataException>(()=>Bank().MoveIntoBankAsync(source,new(false,31,29),Hash(source.Data)));
         Assert.Equal(0,source.Writes);Assert.Equal(before,source.Data);Assert.Empty(await Bank().ListAsync());Assert.False(await Bank().HasPendingMoveAsync());
+    }
+
+    [Fact]
+    public async Task UsumExclusivePokemonStaysInBankIfSMRefusesAndCanReturnToOriginal()
+    {
+        var source=new Document("usum",Gen7Fixtures.Create(GameVersion.US,boxPokemon:new PK7{Species=807,CurrentLevel=50,Version=GameVersion.US}));
+        var target=new Document("sm",Gen7Fixtures.Create(GameVersion.SN));var before=target.Data.ToArray();
+        await Bank().MoveIntoBankAsync(source,new(false,31,29),Hash(source.Data));var entry=Assert.Single(await Bank().ListAsync());
+        var backup=await Bank().ExportAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(()=>Bank().MoveToSaveAsync(entry.Entry.Id,target,new(false,0,0),Hash(target.Data)));
+        Assert.Equal(before,target.Data);Assert.Equal(0,target.Writes);Assert.Equal(entry.Entry.Id,Assert.Single(await Bank().ListAsync()).Entry.Id);
+        Assert.False(await Bank().HasPendingMoveAsync());
+        await Bank().MoveToSaveAsync(entry.Entry.Id,source,new(false,31,29),Hash(source.Data));
+        Assert.Empty(await Bank().ListAsync());Assert.Equal(entry.Pokemon.StoredData,View(source.Data).Boxes[31].Slots[29].StoredData);
+        Assert.Equal(0,await Bank().ImportAsync(backup));
     }
     public void Dispose(){if(Directory.Exists(root))Directory.Delete(root,true);}
 }

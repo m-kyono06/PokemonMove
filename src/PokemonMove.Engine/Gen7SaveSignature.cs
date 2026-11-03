@@ -4,21 +4,21 @@ using System.Security.Cryptography;
 
 namespace PokemonMove.Engine;
 
-/// <summary>Sun/Moon save-file signatures with fixed-width RSA encoding, including leading-zero results.</summary>
+/// <summary>Sun/Moon and USUM save-file signatures with fixed-width RSA encoding, including leading-zero results.</summary>
 public static class Gen7SaveSignature
 {
     public static bool Verify(ReadOnlySpan<byte> main)
     {
-        return main.Length == Gen7SaveReader.MainSize
-            && VerifyPayload(main.Slice(Gen7SaveReader.SignatureOffset, 128), out var payload)
-            && payload.AsSpan(0, 32).SequenceEqual(SHA256.HashData(main.Slice(main.Length - 0x200, 0x140)));
+        return (main.Length is Gen7SaveReader.MainSize or Gen7SaveReader.UsumMainSize)
+            && VerifyPayload(main.Slice(Gen7SaveReader.SignatureOffsetFor(main.Length), 128), out var payload)
+            && payload.AsSpan(0, 32).SequenceEqual(SHA256.HashData(main.Slice(main.Length - 0x200, Gen7SaveReader.SignatureTableLengthFor(main.Length))));
     }
     public static void Sign(Span<byte> main)
     {
-        if (main.Length != Gen7SaveReader.MainSize) throw new InvalidDataException("サン・ムーンのmainではありません。");
-        var signature = main.Slice(Gen7SaveReader.SignatureOffset, 128);
+        if (main.Length is not (Gen7SaveReader.MainSize or Gen7SaveReader.UsumMainSize)) throw new InvalidDataException("サン・ムーン／USUMのmainではありません。");
+        var signature = main.Slice(Gen7SaveReader.SignatureOffsetFor(main.Length), 128);
         signature.Clear();
-        SHA256.HashData(main.Slice(main.Length - 0x200, 0x140), signature);
+        SHA256.HashData(main.Slice(main.Length - 0x200, Gen7SaveReader.SignatureTableLengthFor(main.Length)), signature);
         SignPayload(signature);
     }
     public static void SignPayload(Span<byte> data)

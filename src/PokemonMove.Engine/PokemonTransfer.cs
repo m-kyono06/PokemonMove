@@ -9,7 +9,7 @@ public sealed class PokemonTransfer
     public PokemonTransferPlan Prepare(PokemonSummary pokemon, string targetFormat, DateOnly? transferDate = null, TransferTrainerProfile? trainer = null)
     {
         var source = new PokemonCodec().Decode(pokemon.StoredData, pokemon.FormatKey);
-        if (targetFormat == "sm") return PrepareGen7(source, trainer);
+        if (targetFormat is "sm" or "usum") return PrepareGen7(source, trainer);
         if (source.FormatKey == "pk7") throw new InvalidDataException("第7世代の個体は以前の作品へ戻せません。個体はバンクに残っています。");
         if (targetFormat is "xy" or "oras") return PrepareGen6(source, trainer);
         if (source.FormatKey == "pk6") throw new InvalidDataException("第6世代の個体をDS作品へ戻すことはできません。個体はバンクに残っています。");
@@ -83,7 +83,7 @@ public sealed class PokemonTransfer
     private static PokemonTransferPlan PrepareGen7(PokemonSummary source, TransferTrainerProfile? trainer)
     {
         if (source.FormatKey == "pk7") return new(source, false, []);
-        if (source.FormatKey != "pk6") throw new InvalidDataException("先にXY・ORASを経由してからサン・ムーンへ移動してください。");
+        if (source.FormatKey != "pk6") throw new InvalidDataException("先にXY・ORASを経由してからサン・ムーン／USUMへ移動してください。");
         if (trainer is null || string.IsNullOrWhiteSpace(trainer.Name)) throw new InvalidDataException("移動先のトレーナー情報を確認できません。");
         var pk6 = new PK6(source.StoredData.ToArray());
         if (pk6.IsEgg) throw new InvalidDataException("タマゴは第7世代へ移動できません。ゲーム内で孵化させてください。");

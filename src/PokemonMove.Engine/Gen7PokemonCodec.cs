@@ -12,7 +12,7 @@ public sealed class Gen7PokemonCodec : IPokemonCodec
         if (data.Length != new PK7().SIZE_STORED)
             throw new InvalidDataException("第7世代のポケモンデータのサイズが不正です。");
         var pokemon = new PK7(data.ToArray());
-        if (pokemon.Species is 0 or > 802 || !pokemon.ChecksumValid)
+        if (pokemon.Species is 0 or > 807 || !pokemon.ChecksumValid)
             throw new InvalidDataException("ポケモンデータの検証に失敗しました。");
         return PokemonCodec.Describe(pokemon, 0);
     }
