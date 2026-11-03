@@ -10,6 +10,12 @@ public sealed class BankPage : ContentPage
     private readonly ISaveDocuments documents;
     private readonly ISaveReader reader;
     private readonly IRegisteredSaves registry;
+    private readonly IPokemonInspection inspection;
+    private readonly IDualScreenManager dual;
+    private readonly UserOperations operations;
+    private BankItem? selectedItem;
+    private readonly Label selected = new() { Text = "ポケモンを選択してください。", TextColor = Colors.White, FontSize = 12 };
+    private readonly Button withdraw = ActionButton("選択したポケモンをセーブへ移動");
     private bool pendingMove;
     private IReadOnlyList<BankItem> items = [];
     private List<BankItem> filtered = [];
@@ -23,12 +29,15 @@ public sealed class BankPage : ContentPage
     private readonly Button recover = ActionButton("中断した移動を復旧する");
     private readonly Button exportSave = ActionButton("直前のセーブのバックアップを書き出す");
 
-    public BankPage(IBankStore bank, ISaveDocuments documents, ISaveReader reader, IRegisteredSaves registry)
+    public BankPage(IBankStore bank, ISaveDocuments documents, ISaveReader reader, IRegisteredSaves registry, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
     {
         this.bank = bank;
         this.documents = documents;
         this.reader = reader;
         this.registry = registry;
+        this.inspection = inspection;
+        this.dual = dual;
+        this.operations = operations;
         Title = "ローカルバンク";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -81,13 +90,15 @@ public sealed class BankPage : ContentPage
             await File.WriteAllBytesAsync(file, backup.Data);
             await Share.Default.RequestAsync(new ShareFileRequest { Title = "移動前のセーブを保存", File = new ShareFile(file, "application/octet-stream") });
         });
+        withdraw.IsEnabled = false;
+        withdraw.Clicked += async (_, _) => { if (selectedItem is { } item) await Run(() => Withdraw(item)); };
+        SizeChanged += (_, _) => { foreach (var button in slots.Children.OfType<Button>()) button.HeightRequest = SlotHeight; };
         Content = new ScrollView { Content = new VerticalStackLayout
         {
-            Padding = 18, Spacing = 16,
+            Padding = 12, Spacing = 8,
             Children =
             {
-                new Label { Text = "仲間を、この端末に。", FontSize = 24, TextColor = Colors.White, FontAttributes = FontAttributes.Bold },
-                status, search, box, slots,
+                status, search, box, slots, selected, withdraw,
                 new Label { Text = "移動保管した個体は、保管元を含むHGSSセーブのボックスへ引き出せます。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
@@ -122,13 +133,23 @@ public sealed class BankPage : ContentPage
     private void Render()
     {
         slots.Children.Clear();
+        inspection.Clear();
+        selectedItem = null; withdraw.IsEnabled = false; selected.Text = "ポケモンを選択してください。";
         if (box.SelectedIndex < 0) return;
         var page = filtered.Skip(box.SelectedIndex * 30).Take(30).ToArray();
         for (var i = 0; i < page.Length; i++)
         {
             var item = page[i];
-            var button = new Button { Text = item.Pokemon.Label, FontSize = 10, Padding = 1, HeightRequest = 68, CornerRadius = 8, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White };
-            button.Clicked += async (_, _) => await Run(() => Withdraw(item));
+            var button = new Button { Text = item.Pokemon.Label, FontSize = 10, Padding = 1, HeightRequest = SlotHeight, CornerRadius = 8, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White };
+            button.Clicked += async (_, _) =>
+            {
+                if (busy) return;
+                using var operation = operations.Begin();
+                selectedItem = item; withdraw.IsEnabled = item.Entry.TransferEligible && !pendingMove;
+                selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
+                inspection.SelectPokemon(item.Pokemon, $"バンク / 保管元：{item.Entry.SourceGame}");
+                if (!dual.IsActive) await DisplayAlertAsync(item.Pokemon.Name, Detail(item.Pokemon), "閉じる");
+            };
             slots.Add(button, i % 6, i / 6);
         }
     }
@@ -136,6 +157,7 @@ public sealed class BankPage : ContentPage
     private async Task Run(Func<Task> action)
     {
         if (busy) return;
+        using var operation = operations.Begin();
         busy = true;
         export.IsEnabled = import.IsEnabled = exportSave.IsEnabled = recover.IsEnabled = false;
         try { await action(); }
@@ -148,7 +170,7 @@ public sealed class BankPage : ContentPage
 
     private async Task Withdraw(BankItem item)
     {
-        var detail = Detail(item.Pokemon) + $"\n\n保管元：{item.Entry.SourceGame}\nトレーナー：{item.Entry.SourceTrainer}";
+        var detail = (dual.IsActive ? $"{item.Pokemon.Name} Lv.{item.Pokemon.Level}" : Detail(item.Pokemon)) + $"\n\n保管元：{item.Entry.SourceGame}\nトレーナー：{item.Entry.SourceTrainer}";
         if (!item.Entry.TransferEligible)
         {
             await DisplayAlertAsync(item.Pokemon.Name, detail + "\n\n旧版のコピー保管です。元セーブの同じ個体をバンクへ移動すると引き出せるようになります。", "閉じる");
@@ -169,9 +191,17 @@ public sealed class BankPage : ContentPage
         if (!await DisplayAlertAsync("移動を確定", $"{save.Game} / {save.TrainerName}\n{save.Boxes[index].Name} の {slot.Slot + 1}番へ移動します。選択したセーブを書き換え、成功後にバンクから取り除きます。", "移動する", "キャンセル")) return;
         await bank.MoveToSaveAsync(item.Entry.Id, target, new(false, index, slot.Slot), SHA256.HashData(data));
         await Refresh();
+        inspection.SelectPokemon(item.Pokemon, $"{save.Game} / {save.TrainerName} / {save.Boxes[index].Name}へ移動しました");
         await DisplayAlertAsync("移動完了", "セーブへの書き込みを確認し、バンクから取り除きました。", "閉じる");
     }
 
-    internal static string Detail(PokemonSummary p) => $"ニックネーム：{p.Nickname}\nLv.{p.Level}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n\n技\n{string.Join("\n", p.Moves)}";
+    private double SlotHeight => Height > 0 && Height < 550 ? 36 : 60;
+
+    internal static string Detail(PokemonSummary p)
+    {
+        var d = p.Details;
+        var stats = d is null ? "" : $"\nHP {d.Stats.HP} / 攻撃 {d.Stats.Attack} / 防御 {d.Stats.Defense}\n特攻 {d.Stats.SpecialAttack} / 特防 {d.Stats.SpecialDefense} / 素早さ {d.Stats.Speed}";
+        return $"ニックネーム：{p.Nickname}\nLv.{p.Level} {d?.Gender}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n性格：{d?.Nature ?? "—"}\n特性：{d?.Ability ?? "—"}\nもちもの：{d?.HeldItem ?? "—"}{stats}\n\n技\n{string.Join("\n", p.Moves)}";
+    }
     private static Button ActionButton(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 12 };
 }

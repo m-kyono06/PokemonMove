@@ -8,6 +8,7 @@ public sealed class SaveLibraryPage : ContentPage
     private readonly IRegisteredSaves registry;
     private readonly ISaveDocuments documents;
     private readonly ISaveReader reader;
+    private readonly UserOperations operations;
     private bool busy;
     private readonly Label status = new() { TextColor = Colors.White };
     private readonly Button add = Button("セーブを追加");
@@ -15,9 +16,9 @@ public sealed class SaveLibraryPage : ContentPage
     private readonly Button import = Button("一覧を取り込む");
     private readonly CollectionView saves = new() { SelectionMode = SelectionMode.Single };
 
-    public SaveLibraryPage(IRegisteredSaves registry, ISaveDocuments documents, ISaveReader reader)
+    public SaveLibraryPage(IRegisteredSaves registry, ISaveDocuments documents, ISaveReader reader, UserOperations operations)
     {
-        this.registry = registry; this.documents = documents; this.reader = reader;
+        this.registry = registry; this.documents = documents; this.reader = reader; this.operations = operations;
         Title = "登録セーブの管理"; BackgroundColor = Color.FromArgb("152B36");
         saves.ItemTemplate = new DataTemplate(() =>
         {
@@ -101,7 +102,9 @@ public sealed class SaveLibraryPage : ContentPage
     }
     private async Task Run(Func<Task> action)
     {
-        if (busy) return; busy = true; add.IsEnabled = export.IsEnabled = import.IsEnabled = saves.IsEnabled = false;
+        if (busy) return;
+        using var operation = operations.Begin();
+        busy = true; add.IsEnabled = export.IsEnabled = import.IsEnabled = saves.IsEnabled = false;
         try { await action(); }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
         { status.Text = "登録一覧を処理できませんでした。"; await DisplayAlertAsync("登録できませんでした", ex is InvalidDataException ? ex.Message : "ファイルの保存場所と権限を確認してください。", "閉じる"); }

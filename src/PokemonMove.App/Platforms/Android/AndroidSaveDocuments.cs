@@ -15,7 +15,7 @@ public sealed class AndroidSaveDocuments : ISaveDocuments
     }
 
     public Task<ISaveDocument?> PickAsync() => MainThread.InvokeOnMainThreadAsync(() =>
-        (Platform.CurrentActivity as MainActivity ?? throw new IOException("画面を開き直してください。")).PickSaveAsync());
+        (MainActivity.ControlActivity ?? throw new IOException("画面を開き直してください。")).PickSaveAsync());
 }
 
 internal sealed class AndroidSaveDocument(Android.Net.Uri uri) : ISaveDocument

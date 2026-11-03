@@ -7,6 +7,9 @@ public sealed class CollectionPage : ContentPage
     private readonly IBankStore bank;
     private readonly ISaveLibraryReader library;
     private readonly ICollectionDex dex;
+    private readonly IPokemonInspection inspection;
+    private readonly IDualScreenManager dual;
+    private readonly UserOperations operations;
     private CollectionDexSnapshot? snapshot;
     private bool loading;
     private bool active;
@@ -20,9 +23,9 @@ public sealed class CollectionPage : ContentPage
     private readonly Label empty = new() { TextColor = Colors.LightGray, Margin = 12 };
     private readonly CollectionView entries = new() { SelectionMode = SelectionMode.Single };
 
-    public CollectionPage(IBankStore bank, ICollectionDex dex, ISaveLibraryReader library)
+    public CollectionPage(IBankStore bank, ICollectionDex dex, ISaveLibraryReader library, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
     {
-        this.bank = bank; this.dex = dex; this.library = library;
+        this.bank = bank; this.dex = dex; this.library = library; this.inspection = inspection; this.dual = dual; this.operations = operations;
         Title = "収集図鑑";
         BackgroundColor = Color.FromArgb("152B36");
         entries.ItemTemplate = new DataTemplate(() =>
@@ -40,6 +43,9 @@ public sealed class CollectionPage : ContentPage
         entries.SelectionChanged += async (_, e) =>
         {
             if (e.CurrentSelection.FirstOrDefault() is not Row row) return;
+            using var operation = operations.Begin();
+            inspection.SelectSpecies(row.Entry, row.Variant);
+            if (dual.IsActive) return;
             entries.SelectedItem = null;
             var p = row.Entry;
             await DisplayAlertAsync(row.Title,
@@ -76,6 +82,7 @@ public sealed class CollectionPage : ContentPage
     private async Task Refresh()
     {
         if (loading) return;
+        using var operation = operations.Begin();
         loading = true; refresh.IsEnabled = false;
         search.IsEnabled = variant.IsEnabled = ownership.IsEnabled = false;
         empty.Text = "所持状況を集計中…";
@@ -112,6 +119,7 @@ public sealed class CollectionPage : ContentPage
     private void Filter()
     {
         if (snapshot is null || variant.SelectedIndex < 0 || ownership.SelectedIndex < 0) return;
+        inspection.Clear();
         empty.Text = "該当するポケモンはいません。";
         var kind = (DexVariant)variant.SelectedIndex;
         var state = (DexOwnership)ownership.SelectedIndex;

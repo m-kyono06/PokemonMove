@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/PokeAPI/sprites",
+  "commit": "1dd55c0436d2a5b6e324c0b780e1b1b416fbfb64",
+  "path": "sprites/pokemon/{shiny/}{species}.png",
+  "species": [
+    1,
+    493
+  ],
+  "image_count": 986
+}

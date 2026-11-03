@@ -2,14 +2,20 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using PokemonMove.Domain;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PokemonMove.App;
 
 [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true,
     ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode |
-        ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
+        ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden | ConfigChanges.Navigation)]
 public class MainActivity : MauiAppCompatActivity
 {
+    private static WeakReference<MainActivity>? controlActivity;
+    internal static MainActivity? ControlActivity => controlActivity?.TryGetTarget(out var activity) == true && !activity.IsFinishing ? activity : null;
+    private AndroidDualScreenManager? Dual => IPlatformApplication.Current?.Services.GetService<IDualScreenManager>() as AndroidDualScreenManager;
+    protected override void OnResume() { base.OnResume(); controlActivity = new(this); Dual?.Resume(this); }
+    protected override void OnStop() { Dual?.Suspend(this); base.OnStop(); }
     private const int SaveRequest = 9017;
     private TaskCompletionSource<ISaveDocument?>? saveRequest;
 

@@ -12,6 +12,9 @@ public static class MauiProgram
 
     private static MauiAppBuilder ConfigureServices(this MauiAppBuilder builder)
     {
+        builder.Services.AddSingleton<UserOperations>();
+        builder.Services.AddSingleton<IPokemonInspection, PokemonInspection>();
+        builder.Services.AddSingleton<IDualScreenManager, AndroidDualScreenManager>();
         builder.Services.AddSingleton<ISaveReader, HgssSaveReader>();
         builder.Services.AddSingleton<ICollectionDex, HgssCollectionDex>();
         builder.Services.AddSingleton<IPokemonCodec, HgssPokemonCodec>();
@@ -25,7 +28,7 @@ public static class MauiProgram
     }
 }
 
-public sealed class App(MainPage page) : Application
+public sealed class App(IServiceProvider services) : Application
 {
-    protected override Window CreateWindow(IActivationState? activationState) => new(new NavigationPage(page) { BarBackgroundColor = Color.FromArgb("152B36"), BarTextColor = Colors.White });
+    protected override Window CreateWindow(IActivationState? activationState) => new(new NavigationPage(services.GetRequiredService<MainPage>()) { BarBackgroundColor = Color.FromArgb("152B36"), BarTextColor = Colors.White });
 }

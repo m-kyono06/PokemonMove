@@ -15,6 +15,13 @@ public sealed class MainPage : ContentPage
     private readonly ICollectionDex dex;
     private readonly IRegisteredSaves registry;
     private readonly ISaveLibraryReader library;
+    private readonly IPokemonInspection inspection;
+    private readonly IDualScreenManager dual;
+    private readonly UserOperations operations;
+    private PokemonSummary? selectedPokemon;
+    private PokemonLocation? selectedPosition;
+    private readonly Label selected = new() { Text = "ポケモンを選択してください。", FontSize = 12, TextColor = Colors.White };
+    private readonly Button deposit = new() { Text = "選択したポケモンをバンクへ移動", IsEnabled = false, FontSize = 13, BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 12 };
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
     private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っているHGSSのセーブを選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
@@ -22,7 +29,7 @@ public sealed class MainPage : ContentPage
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
 
-    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex, IRegisteredSaves registry, ISaveLibraryReader library)
+    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex, IRegisteredSaves registry, ISaveLibraryReader library, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
     {
         this.reader = reader;
         this.bank = bank;
@@ -30,6 +37,9 @@ public sealed class MainPage : ContentPage
         this.dex = dex;
         this.registry = registry;
         this.library = library;
+        this.inspection = inspection;
+        this.dual = dual;
+        this.operations = operations;
         Title = "PokemonMove";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -38,39 +48,41 @@ public sealed class MainPage : ContentPage
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
         var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
-        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader, registry));
+        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader, registry, inspection, dual, operations));
         var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
         dexButton.Clicked += async (_, _) =>
         {
             if (loading || storing) return;
-            await Navigation.PushAsync(new CollectionPage(bank, dex, library));
+            await Navigation.PushAsync(new CollectionPage(bank, dex, library, inspection, dual, operations));
         };
-        var libraryButton = new Button { Text = "登録セーブを管理", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
-        libraryButton.Clicked += async (_, _) =>
-        {
-            if (loading || storing) return;
-            await Navigation.PushAsync(new SaveLibraryPage(registry, documents, reader));
-        };
+        var libraryItem = new ToolbarItem { Text = "登録セーブを管理", Order = ToolbarItemOrder.Secondary };
+        libraryItem.Clicked += async (_, _) => { if (!loading && !storing) await Navigation.PushAsync(new SaveLibraryPage(registry, documents, reader, operations)); };
+        ToolbarItems.Add(libraryItem);
+        var screensItem = new ToolbarItem { Text = "2画面設定", Order = ToolbarItemOrder.Secondary };
+        screensItem.Clicked += async (_, _) => { if (!loading && !storing) await Navigation.PushAsync(new DualScreenSettingsPage(dual)); };
+        ToolbarItems.Add(screensItem);
+        var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 6 };
+        open.Text = "セーブを開く"; bankButton.Text = "バンク"; dexButton.Text = "収集図鑑";
+        foreach (var button in new[] { open, bankButton, dexButton }) { button.FontSize = 12; button.Padding = 6; button.HeightRequest = 40; }
+        actions.Add(open, 0); actions.Add(bankButton, 1); actions.Add(dexButton, 2);
+        status.FontSize = 12;
+        deposit.Clicked += async (_, _) => { if (selectedPokemon is { } p && selectedPosition is { } position) await ShowPokemon(p, position); };
+        SizeChanged += (_, _) => { foreach (var button in slots.Children.OfType<Button>()) button.HeightRequest = SlotHeight; };
         Content = new ScrollView
         {
-            Content = new VerticalStackLayout
+            Content = new VerticalStackLayout { Padding = 12, Spacing = 8, Children =
             {
-                Padding = new Thickness(18, 30), Spacing = 20,
-                Children =
-                {
-                    new Label { Text = "POKEMON MOVE", FontSize = 13, CharacterSpacing = 3, TextColor = Color.FromArgb("61DFC0") },
-                    new Label { Text = "冒険の仲間を、ひとつに。", FontSize = 26, FontAttributes = FontAttributes.Bold, TextColor = Colors.White },
-                    new Label { Text = "ハートゴールド / ソウルシルバー", TextColor = Color.FromArgb("AFC2CD") },
-                    open, bankButton, dexButton, libraryButton, status, location, slots,
-                    new Label { Text = "移動前にエミュレータを終了してください。選択したセーブを書き換えます。別のコピーを選ぶと、エミュレータ側の元データは変わりません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\n保管時は元の枠から取り除き、引き出し時はバンクから取り除きます。バックアップはバンク画面から書き出せます。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
-                }
-            }
+                actions, status, location, slots, selected, deposit,
+                new Label { Text = "操作前にエミュレータを終了してください。選択した実ファイルを書き換えます。2画面設定・登録一覧は右上メニューから開けます。", FontSize = 11, TextColor = Color.FromArgb("AFC2CD") }
+            }}
         };
     }
+    private double SlotHeight => Height > 0 && Height < 550 ? 36 : 60;
 
     private async void OpenSave(object? sender, EventArgs e)
     {
         if (loading || storing) return;
+        using var operation = operations.Begin();
         loading = true;
         open.IsEnabled = false;
         slots.IsEnabled = false;
@@ -82,6 +94,7 @@ public sealed class MainPage : ContentPage
             var data = await file.ReadAsync();
             var loaded = await Task.Run(() => reader.Read(data));
             await registry.RegisterAsync(file.Id, loaded);
+            inspection.Clear();
             sourceDocument = file;
             sourceHash = SHA256.HashData(data);
             snapshot = loaded;
@@ -91,7 +104,7 @@ public sealed class MainPage : ContentPage
             location.IsVisible = true;
             location.SelectedIndex = 0;
             status.Text = $"{loaded.Game}\nトレーナー：{loaded.TrainerName}" +
-                (loaded.Warnings.Count == 0 ? "" : "\n\n注意：" + string.Join("\n", loaded.Warnings));
+                (loaded.Warnings.Count == 0 ? "" : "\n追加領域に警告あり。手持ち・ボックスは正常です。");
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -105,6 +118,7 @@ public sealed class MainPage : ContentPage
     {
         base.OnAppearing();
         if (sourceDocument is null || storing || loading) return;
+        using var operation = operations.Begin();
         loading = true;
         open.IsEnabled = false;
         slots.IsEnabled = false;
@@ -113,7 +127,7 @@ public sealed class MainPage : ContentPage
             var data = await sourceDocument.ReadAsync();
             snapshot = await Task.Run(() => reader.Read(data));
             sourceHash = SHA256.HashData(data);
-            status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}" + (snapshot.Warnings.Count == 0 ? "" : "\n" + string.Join("\n", snapshot.Warnings));
+            status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}" + (snapshot.Warnings.Count == 0 ? "" : "\n追加領域に警告あり。手持ち・ボックスは正常です。");
             if (location.Items.Count > 0) location.Items[0] = $"手持ち（{snapshot.Party.Count}匹）";
             RenderSlots();
         }
@@ -125,18 +139,30 @@ public sealed class MainPage : ContentPage
     private void RenderSlots()
     {
         slots.Children.Clear();
+        inspection.Clear();
+        selectedPokemon = null; selectedPosition = null; deposit.IsEnabled = false;
+        selected.Text = "ポケモンを選択してください。";
         if (snapshot is null || location.SelectedIndex < 0) return;
         var selectedLocation = location.SelectedIndex;
+        var renderedSave = snapshot;
         var pokemon = selectedLocation == 0 ? snapshot.Party : snapshot.Boxes[selectedLocation - 1].Slots;
         foreach (var p in pokemon)
         {
             var button = new Button
             {
-                Text = p.Label, FontSize = 10, Padding = new Thickness(1), HeightRequest = 68,
+                Text = p.Label, FontSize = 10, Padding = new Thickness(1), HeightRequest = SlotHeight,
                 BackgroundColor = Color.FromArgb(p.Species == 0 ? "1C333E" : "294D59"), TextColor = Colors.White,
                 CornerRadius = 8, IsEnabled = p.Species != 0,
             };
-            button.Clicked += async (_, _) => await ShowPokemon(p, new PokemonLocation(selectedLocation == 0, selectedLocation - 1, p.Slot));
+            button.Clicked += async (_, _) =>
+            {
+                if (loading || storing || !ReferenceEquals(snapshot, renderedSave)) return;
+                using var operation = operations.Begin();
+                selectedPokemon = p; selectedPosition = new(selectedLocation == 0, selectedLocation - 1, p.Slot);
+                selected.Text = $"選択：{p.Name} Lv.{p.Level}"; deposit.IsEnabled = p.CanStore;
+                inspection.SelectPokemon(p, $"{snapshot.Game} / {snapshot.TrainerName} / {(selectedLocation == 0 ? "手持ち" : snapshot.Boxes[selectedLocation - 1].Name)}");
+                if (!dual.IsActive) await DisplayAlertAsync(p.Name, BankPage.Detail(p), "閉じる");
+            };
             slots.Add(button, p.Slot % 6, p.Slot / 6);
         }
     }
@@ -144,12 +170,13 @@ public sealed class MainPage : ContentPage
     private async Task ShowPokemon(PokemonSummary pokemon, PokemonLocation position)
     {
         if (storing || loading || snapshot is null || sourceDocument is null) return;
+        using var operation = operations.Begin();
         storing = true;
         open.IsEnabled = false;
         slots.IsEnabled = false;
         try
         {
-            var detail = BankPage.Detail(pokemon);
+            var detail = dual.IsActive ? $"{pokemon.Name} Lv.{pokemon.Level}" : BankPage.Detail(pokemon);
             if (!pokemon.CanStore)
             {
                 await DisplayAlertAsync(pokemon.Name, detail + "\n\nデータ検証に失敗したため保管できません。", "閉じる");
@@ -163,6 +190,7 @@ public sealed class MainPage : ContentPage
             status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}\n移動後のセーブを表示中";
             if (location.Items.Count > 0) location.Items[0] = $"手持ち（{snapshot.Party.Count}匹）";
             RenderSlots();
+            inspection.SelectPokemon(pokemon, "バンクへ移動しました");
             await DisplayAlertAsync("移動完了", "セーブから取り除き、バンクに保管しました。移動前のセーブはバックアップされています。", "閉じる");
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)

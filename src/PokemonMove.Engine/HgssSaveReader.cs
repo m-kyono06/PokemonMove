@@ -20,7 +20,7 @@ public sealed class HgssSaveReader : PokemonMove.Domain.ISaveReader
             throw new InvalidDataException("HGSSのセーブとして読み取れません。ゲーム内で保存したセーブを選択してください。");
         ValidateDisplayBlocks(hgss);
         var warnings = hgss.ChecksumsValid ? Array.Empty<string>() :
-            new[] { "追加領域（バトルビデオ等）のチェックサムに不一致があります。手持ち・ボックスの検証は正常です。表示専用で読み込んでいます。" };
+            new[] { "追加領域（バトルビデオ等）のチェックサムに不一致があります。手持ち・ボックスの検証は正常です。追加領域は変更しません。" };
         var party = Enumerable.Range(0, hgss.PartyCount).Select(i => HgssPokemonCodec.Describe(hgss.GetPartySlotAtIndex(i), i)).ToArray();
         var boxes = Enumerable.Range(0, hgss.BoxCount).Select(b => new BoxSnapshot(hgss.GetBoxName(b),
             Enumerable.Range(0, hgss.BoxSlotCount).Select(s => HgssPokemonCodec.Describe(hgss.GetBoxSlotAtIndex(b, s), s)).ToArray())).ToArray();
