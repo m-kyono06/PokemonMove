@@ -15,11 +15,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<UserOperations>();
         builder.Services.AddSingleton<IPokemonInspection, PokemonInspection>();
         builder.Services.AddSingleton<IDualScreenManager, AndroidDualScreenManager>();
-        builder.Services.AddSingleton<ISaveReader, DsSaveReader>();
+        builder.Services.AddSingleton<ISaveReader, GameSaveReader>();
         builder.Services.AddSingleton<ICollectionDex, CollectionDex>();
         builder.Services.AddSingleton<IPokemonCodec, PokemonCodec>();
         builder.Services.AddSingleton<IBankStore>(services => new LocalBankStore(
-            Path.Combine(FileSystem.AppDataDirectory, "bank"), services.GetRequiredService<IPokemonCodec>(), new DsSaveEditor()));
+            Path.Combine(FileSystem.AppDataDirectory, "bank"), services.GetRequiredService<IPokemonCodec>(), new GameSaveEditor()));
         builder.Services.AddSingleton<ISaveDocuments, AndroidSaveDocuments>();
         builder.Services.AddSingleton<IRegisteredSaves>(_ => new LocalRegisteredSaves(Path.Combine(FileSystem.AppDataDirectory, "saves")));
         builder.Services.AddSingleton<ISaveLibraryReader, RegisteredSaveLibraryReader>();

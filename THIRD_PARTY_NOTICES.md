@@ -2,7 +2,7 @@
 
 - [PKHeX.Core](https://github.com/kwsch/PKHeX), version 26.10.18:
   Copyright © Kaphotics and contributors. GPL-3.0-or-later.
-  Used for Generation 4/5 save parsing and forward conversion and Japanese game text. Restored from NuGet;
+  Used for Generation 4/5/6 save parsing and forward conversion and Japanese game text. Restored from NuGet;
   no PKForge source or artwork is copied into this project.
 - Microsoft .NET MAUI: MIT license.
 - xUnit.net (tests): Apache-2.0 license.
@@ -25,6 +25,6 @@ These dependencies retain their respective licenses and copyright notices.
 
 - Pokémon front sprites: hosted by [PokeAPI/sprites](https://github.com/PokeAPI/sprites)
   at commit 1dd55c0436d2a5b6e324c0b780e1b1b416fbfb64. Unmodified normal/shiny
-  images for species 1–649 are bundled for offline use. Pokémon artwork remains
+  images for species 1–721 are bundled for offline use. Pokémon artwork remains
   © Nintendo, Creatures Inc., GAME FREAK inc. Form/gender artwork is representative.
   See src/PokemonMove.App/Resources/PokemonSprites/NOTICE.md and SOURCE.json.

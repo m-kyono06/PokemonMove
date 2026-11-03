@@ -7,7 +7,7 @@ public sealed class Gen5SaveReader : PokemonMove.Domain.ISaveReader
 {
     internal static SAV5 Open(byte[] data)
     {
-        if (DsSaveReader.Detect(data) is not SAV5 save || save is not (SAV5BW or SAV5B2W2))
+        if (GameSaveReader.Detect(data) is not SAV5 save || save is not (SAV5BW or SAV5B2W2))
             throw new InvalidDataException("BW・BW2の通常セーブを選択してください。");
         // Validate both each local CRC and its mirror in the checksum table. Do not repair damaged input.
         if (!save.ChecksumsValid)

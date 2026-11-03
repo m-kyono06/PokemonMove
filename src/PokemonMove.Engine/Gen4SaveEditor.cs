@@ -37,7 +37,7 @@ public sealed class Gen4SaveEditor : ISaveEditor
         ValidateLocation(save, location);
         if (save.GetBoxSlotAtIndex(location.Box, location.Slot).Species != 0)
             throw new InvalidDataException("引き出し先の枠は空いていません。");
-        if (formatKey != "pk4") throw new InvalidDataException("第5世代の個体を第4世代へ戻すことはできません。");
+        if (formatKey != "pk4") throw new InvalidDataException("新しい世代の個体を第4世代へ戻すことはできません。");
         var summary = new Gen4PokemonCodec().Decode(pokemon, formatKey);
         // Do not insert a second byte-identical instance into the destination save.
         if (snapshot.Party.Concat(snapshot.Boxes.SelectMany(b => b.Slots))

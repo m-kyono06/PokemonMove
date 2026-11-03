@@ -58,7 +58,7 @@ public sealed class CollectionPage : ContentPage
         var filters = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 12 };
         filters.Add(variant, 0); filters.Add(ownership, 1);
         var heading = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
-        heading.Add(new Label { Text = "全国図鑑 No.001–649", FontSize = 20, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, VerticalOptions = LayoutOptions.Center }, 0);
+        heading.Add(new Label { Text = "全国図鑑 No.001–721", FontSize = 20, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, VerticalOptions = LayoutOptions.Center }, 0);
         heading.Add(refresh, 1);
         var header = new VerticalStackLayout { Padding = 12, Spacing = 6, Children =
         {

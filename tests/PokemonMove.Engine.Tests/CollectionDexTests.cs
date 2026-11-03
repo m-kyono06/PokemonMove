@@ -22,13 +22,13 @@ public sealed class CollectionDexTests
     {
         var result = dex.Build(null, []);
         Assert.False(result.IncludesSave);
-        Assert.Equal(649, result.Entries.Count);
+        Assert.Equal(721, result.Entries.Count);
         Assert.Equal((ushort)1, result.Entries[0].Species);
         Assert.Equal("フシギダネ", result.Entries[0].Name);
-        Assert.Equal((ushort)649, result.Entries[^1].Species);
-        Assert.Equal("ゲノセクト", result.Entries[^1].Name);
+        Assert.Equal((ushort)721, result.Entries[^1].Species);
+        Assert.Equal("ボルケニオン", result.Entries[^1].Name);
         Assert.Equal(0, result.Owned(DexVariant.All));
-        Assert.Equal(649, dex.Filter(result, DexVariant.All, DexOwnership.Missing, "").Count);
+        Assert.Equal(721, dex.Filter(result, DexVariant.All, DexOwnership.Missing, "").Count);
         Assert.Empty(dex.Filter(result, DexVariant.All, DexOwnership.Owned, ""));
     }
 
@@ -62,7 +62,7 @@ public sealed class CollectionDexTests
         Assert.Equal(1, result.Entries[151].Boxes(DexVariant.Shiny));
         Assert.Equal(0, result.Entries[24].Count(DexVariant.Normal));
         Assert.Equal(1, result.Entries[24].Bank(DexVariant.Shiny));
-        Assert.Equal(648, dex.Filter(result, DexVariant.Normal, DexOwnership.Missing, "").Count);
+        Assert.Equal(720, dex.Filter(result, DexVariant.Normal, DexOwnership.Missing, "").Count);
     }
 
     [Fact]
@@ -80,9 +80,9 @@ public sealed class CollectionDexTests
     }
 
     [Theory]
-    [InlineData("ちこ", 152)]
-    [InlineData("チコ", 152)]
-    [InlineData("ﾁｺ", 152)]
+    [InlineData("ちこり", 152)]
+    [InlineData("チコリ", 152)]
+    [InlineData("ﾁｺﾘ", 152)]
     [InlineData("１５２", 152)]
     [InlineData(" 001 ", 1)]
     [InlineData("493", 493)]
@@ -101,7 +101,7 @@ public sealed class CollectionDexTests
         var result = dex.Build(Save([p]), [Bank(p)]);
         Assert.Empty(dex.Filter(result, DexVariant.All, DexOwnership.Missing, "152"));
         Assert.Single(dex.Filter(result, DexVariant.All, DexOwnership.Owned, "152"));
-        Assert.Empty(dex.Filter(result, DexVariant.All, DexOwnership.All, "650"));
+        Assert.Empty(dex.Filter(result, DexVariant.All, DexOwnership.All, "722"));
         Assert.Empty(dex.Filter(result, DexVariant.All, DexOwnership.All, "見つからない名前"));
         Assert.Equal(1, result.Owned(DexVariant.All));
         Assert.Equal(original, p.StoredData);
@@ -129,17 +129,31 @@ public sealed class CollectionDexTests
     }
 
     [Fact]
-    public void AggregatesGen4Gen5AndBankIntoOne649SpeciesCollection()
+    public void AggregatesGen4Gen5AndBankIntoOne721SpeciesCollection()
     {
-        var old = new DsSaveReader().Read(PokemonMove.TestSupport.Gen4Fixtures.Create(GameVersion.SS));
-        var bw = new DsSaveReader().Read(PokemonMove.TestSupport.Gen5Fixtures.Create(GameVersion.B));
+        var old = new GameSaveReader().Read(PokemonMove.TestSupport.Gen4Fixtures.Create(GameVersion.SS));
+        var bw = new GameSaveReader().Read(PokemonMove.TestSupport.Gen5Fixtures.Create(GameVersion.B));
         var pk5 = bw.Boxes[23].Slots[29];
         var result = dex.BuildAll([old, bw], [new(new(Guid.NewGuid(), "W2", "TEST", DateTimeOffset.UtcNow, pk5.StoredData) { FormatKey = "pk5" }, pk5)]);
-        Assert.Equal(649, result.Entries.Count); Assert.Equal(2, result.SaveCount);
+        Assert.Equal(721, result.Entries.Count); Assert.Equal(2, result.SaveCount);
         Assert.Equal(1, result.Entries[386].BoxCount);
         Assert.Equal(1, result.Entries[648].BoxCount); Assert.Equal(1, result.Entries[648].BankCount);
         Assert.Equal("ブラック", Assert.Single(result.Entries[648].Saves).Game);
         Assert.Single(dex.Filter(result, DexVariant.All, DexOwnership.Owned, "げのせくと"));
+    }
+
+    [Fact]
+    public void KeepsXYAndDSCollectionTogetherAndExcludesSpeciesFromWrongFormats()
+    {
+        var xy = new GameSaveReader().Read(PokemonMove.TestSupport.Gen6Fixtures.Create(GameVersion.X));
+        var bw = new GameSaveReader().Read(PokemonMove.TestSupport.Gen5Fixtures.Create(GameVersion.B));
+        var ss = new GameSaveReader().Read(PokemonMove.TestSupport.Gen4Fixtures.Create(GameVersion.SS));
+        var result = dex.BuildAll([xy, bw, ss], []);
+        Assert.Equal(3, result.SaveCount); Assert.Equal(721, result.Entries.Count);
+        Assert.Equal(1, result.Entries[649].BoxCount); Assert.Equal("X", Assert.Single(result.Entries[649].Saves).Game);
+        Assert.Equal(1, result.Entries[648].BoxCount); Assert.Equal(1, result.Entries[386].BoxCount);
+        var wrong = xy.Boxes[30].Slots[29] with { FormatKey = "pk5" };
+        Assert.Equal(0, dex.Build(null, [Bank(wrong)]).Owned(DexVariant.All));
     }
 
 }

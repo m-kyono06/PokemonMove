@@ -10,6 +10,7 @@ public sealed class PokemonCodec : IPokemonCodec
     {
         "pk4" => new Gen4PokemonCodec().Decode(data),
         "pk5" => new Gen5PokemonCodec().Decode(data),
+        "pk6" => new Gen6PokemonCodec().Decode(data),
         _ => throw new InvalidDataException("対応していないポケモンのデータ形式です。"),
     };
 
@@ -22,7 +23,7 @@ public sealed class PokemonCodec : IPokemonCodec
         var types = new[] { At(strings.types, personal.Type1), At(strings.types, personal.Type2) }.Distinct();
         var data = Array.Empty<byte>();
         // Check before writing: PKHeX refreshes the entity checksum during serialization.
-        if (p.Species <= (p.Format == 5 ? 649 : 493) && p.ChecksumValid)
+        if (p.Species <= (p.Format switch { 6 => 721, 5 => 649, _ => 493 }) && p.ChecksumValid)
         {
             data = new byte[p.SIZE_STORED];
             p.WriteEncryptedDataStored(data);
@@ -43,6 +44,6 @@ public sealed class PokemonCodec : IPokemonCodec
         return new(slot, p.Species, At(strings.specieslist, p.Species), p.Nickname,
             p.CurrentLevel, string.Join(" / ", types),
             new[] { p.Move1, p.Move2, p.Move3, p.Move4 }.Where(m => m != 0)
-                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data, IsEgg = p.IsEgg, Form = p.Form, Details = details, FormatKey = p.Format == 5 ? "pk5" : "pk4" };
+                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data, IsEgg = p.IsEgg, Form = p.Form, Details = details, FormatKey = p.Format switch { 6 => "pk6", 5 => "pk5", _ => "pk4" } };
     }
 }

@@ -60,9 +60,9 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
             Text(c, "孵化前のタマゴです。", 235, 180, 25); return;
         }
         Portrait(c);
-        Text(c, p.Nickname, 20, 280, 20);
-        Text(c, p.Type, 20, 303, 16, "AFC2CD");
-        Text(c, p.Form == 0 ? "" : $"フォルム {p.Form}（画像は代表）", 20, 323, 13, "AFC2CD");
+        Text(c, p.Nickname, 20, 280, 20, maxWidth: 180);
+        Text(c, p.Type, 20, 303, 16, "AFC2CD", 180);
+        Text(c, p.Form == 0 ? "" : $"フォルム {p.Form}（画像は代表）", 20, 323, 13, "AFC2CD", 180);
         var d = p.Details;
         Text(c, $"Lv.{p.Level}  {d?.Gender}", 220, 98, 23);
         Text(c, $"性格：{d?.Nature ?? "—"} / 特性：{d?.Ability ?? "—"}", 220, 128, 16);

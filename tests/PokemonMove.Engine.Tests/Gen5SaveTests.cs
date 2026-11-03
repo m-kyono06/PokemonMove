@@ -20,7 +20,7 @@ public sealed class Gen5SaveTests
     public void ReadsAllBoxesDetailsAndExplicitPokemonFormatWithoutChangingInput(GameVersion version, bool dsv, string title, string format)
     {
         var data = Gen5Fixtures.Create(version, dsv); var original = data.ToArray();
-        var view = new DsSaveReader().Read(data);
+        var view = new GameSaveReader().Read(data);
         Assert.Equal(title, view.Game); Assert.Equal(format, view.FormatKey); Assert.Equal("テスト", view.TrainerName);
         Assert.Equal(2, view.Party.Count); Assert.Equal(24, view.Boxes.Count); Assert.Equal(24, view.UnlockedBoxCount);
         Assert.All(view.Boxes, b => Assert.Equal(30, b.Slots.Count));
@@ -44,7 +44,7 @@ public sealed class Gen5SaveTests
     public void EditsOnlyChosenBoxAndChecksumTableAndPreservesBackupAndFooter(GameVersion version, bool dsv)
     {
         var data = Gen5Fixtures.Create(version, dsv); var original = data.ToArray();
-        var editor = new DsSaveEditor(); var reader = new DsSaveReader();
+        var editor = new GameSaveEditor(); var reader = new GameSaveReader();
         var pokemon = reader.Read(data).Boxes[23].Slots[29];
         var removed = editor.Remove(data, new(false, 23, 29));
         Assert.Equal((ushort)0, reader.Read(removed.After).Boxes[23].Slots[29].Species);
@@ -67,8 +67,8 @@ public sealed class Gen5SaveTests
     public void CorruptPrimaryBlocksAreNeverRepairedOrWritten(GameVersion version, int offset)
     {
         var data = Gen5Fixtures.Create(version); data[offset] ^= 1; var before = data.ToArray();
-        Assert.Throws<InvalidDataException>(() => new DsSaveReader().Read(data));
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Remove(data, new(false, 23, 29)));
+        Assert.Throws<InvalidDataException>(() => new GameSaveReader().Read(data));
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Remove(data, new(false, 23, 29)));
         Assert.Equal(before, data);
     }
 
@@ -77,9 +77,9 @@ public sealed class Gen5SaveTests
     [InlineData(GameVersion.W2)]
     public void PartyRemovalCompactsButKeepsOneUsablePokemon(GameVersion version)
     {
-        var editor = new DsSaveEditor();
+        var editor = new GameSaveEditor();
         var result = editor.Remove(Gen5Fixtures.Create(version), new(true, -1, 0));
-        Assert.Equal((ushort)496, Assert.Single(new DsSaveReader().Read(result.After).Party).Species);
+        Assert.Equal((ushort)496, Assert.Single(new GameSaveReader().Read(result.After).Party).Species);
         Assert.Throws<InvalidDataException>(() => editor.Remove(result.After, new(true, -1, 0)));
     }
 
@@ -94,10 +94,10 @@ public sealed class Gen5SaveTests
         var pk = new PK5 { Species = (ushort)species, Form = form, CurrentLevel = 50 };
         var bytes = new byte[pk.SIZE_STORED]; pk.WriteEncryptedDataStored(bytes);
         var data = Gen5Fixtures.Create(version); var before = data.ToArray();
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Insert(data, new(false, 0, 0), bytes, "pk5"));
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Insert(data, new(false, 0, 0), bytes, "pk5"));
         Assert.Equal(before, data);
         if (species == 646)
-            Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Remove(Gen5Fixtures.Create(version, boxPokemon: pk), new(false, 23, 29)));
+            Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Remove(Gen5Fixtures.Create(version, boxPokemon: pk), new(false, 23, 29)));
     }
 
     [Fact]
@@ -105,17 +105,17 @@ public sealed class Gen5SaveTests
     {
         var pk = new PK5 { Species = 645, Form = 1, Ability = 22, HiddenAbility = true, CurrentLevel = 50 };
         var bytes = new byte[pk.SIZE_STORED];pk.WriteEncryptedDataStored(bytes);
-        var result = new DsSaveEditor().Insert(Gen5Fixtures.Create(GameVersion.B2), new(false, 0, 0), bytes, "pk5");
-        Assert.Equal(bytes, new DsSaveReader().Read(result.After).Boxes[0].Slots[0].StoredData);
+        var result = new GameSaveEditor().Insert(Gen5Fixtures.Create(GameVersion.B2), new(false, 0, 0), bytes, "pk5");
+        Assert.Equal(bytes, new GameSaveReader().Read(result.After).Boxes[0].Slots[0].StoredData);
     }
 
     [Fact]
     public void LockedBoxesAndUnknownPokemonFormatsAreRejected()
     {
         var data = Gen5Fixtures.Create(GameVersion.B, unlocked: 8);
-        var pokemon = new DsSaveReader().Read(data).Boxes[23].Slots[29]; var original = data.ToArray();
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Insert(data, new(false, 8, 0), pokemon.StoredData, "pk5"));
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Insert(data, new(false, 0, 0), pokemon.StoredData, "unknown"));
+        var pokemon = new GameSaveReader().Read(data).Boxes[23].Slots[29]; var original = data.ToArray();
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Insert(data, new(false, 8, 0), pokemon.StoredData, "pk5"));
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Insert(data, new(false, 0, 0), pokemon.StoredData, "unknown"));
         Assert.Throws<InvalidDataException>(() => new PokemonCodec().Decode(pokemon.StoredData, "unknown"));
         Assert.Equal(original, data);
     }

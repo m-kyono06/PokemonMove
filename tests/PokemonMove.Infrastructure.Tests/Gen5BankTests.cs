@@ -12,7 +12,7 @@ namespace PokemonMove.Infrastructure.Tests;
 public sealed class Gen5BankTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "PokemonMove-gen5-" + Guid.NewGuid());
-    private LocalBankStore Bank() => new(root, new PokemonCodec(), new DsSaveEditor());
+    private LocalBankStore Bank() => new(root, new PokemonCodec(), new GameSaveEditor());
     private static readonly DateOnly TransferDate = new(2026, 11, 3);
     private sealed class Document(string id, byte[] data) : ISaveDocument
     {
@@ -36,7 +36,7 @@ public sealed class Gen5BankTests : IDisposable
     public static IEnumerable<object[]> ForwardPairs => from source in new[] { GameVersion.D, GameVersion.P, GameVersion.Pt, GameVersion.HG, GameVersion.SS }
         from target in Versions select new object[] { source, target };
     private static byte[] Hash(byte[] data) => SHA256.HashData(data);
-    private static SaveSnapshot View(byte[] data) => new DsSaveReader().Read(data);
+    private static SaveSnapshot View(byte[] data) => new GameSaveReader().Read(data);
 
     [Theory]
     [MemberData(nameof(Pairs))]
@@ -157,10 +157,10 @@ public sealed class Gen5BankTests : IDisposable
         var gen5 = new Document("w2", Gen5Fixtures.Create(GameVersion.W2));
         await Bank().MoveIntoBankAsync(gen5, new(false, 23, 29), Hash(gen5.Data));
         var exported = await Bank().ExportAsync(); var node = JsonNode.Parse(exported)!;
-        Assert.Equal(3, node["Version"]!.GetValue<int>());
+        Assert.Equal(4, node["Version"]!.GetValue<int>());
         Assert.Equal(2, (await Bank().ListAsync()).Count);
         Assert.Contains(await Bank().ListAsync(), item => item.Entry.Id == entry.Entry.Id && item.Entry.TransferEligible);
-        var other = new LocalBankStore(Path.Combine(root, "import"), new PokemonCodec(), new DsSaveEditor());
+        var other = new LocalBankStore(Path.Combine(root, "import"), new PokemonCodec(), new GameSaveEditor());
         Assert.Equal(2, await other.ImportAsync(exported)); Assert.Equal(0, await other.ImportAsync(exported));
         Assert.Contains(await other.ListAsync(), item => item.Entry.FormatKey == "pk5" && item.Entry.TransferEligible);
     }
@@ -171,7 +171,7 @@ public sealed class Gen5BankTests : IDisposable
         var source = new Document("bw", Gen5Fixtures.Create(GameVersion.B));
         await Bank().MoveIntoBankAsync(source, new(false, 23, 29), Hash(source.Data));
         var before = await Bank().ExportAsync(); var node = JsonNode.Parse(before)!;
-        node["Entries"]![0]!["FormatKey"] = "pk6";
+        node["Entries"]![0]!["FormatKey"] = "pk7";
         await Assert.ThrowsAsync<InvalidDataException>(() => Bank().ImportAsync(System.Text.Encoding.UTF8.GetBytes(node.ToJsonString())));
         Assert.Equal(before, await Bank().ExportAsync());
     }

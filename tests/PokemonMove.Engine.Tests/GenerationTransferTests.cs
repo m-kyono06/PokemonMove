@@ -37,7 +37,7 @@ public sealed class GenerationTransferTests
         Assert.Equal(plan.Pokemon.StoredData, new PokemonTransfer().Prepare(source, "b2w2", Date).Pokemon.StoredData);
         Assert.Equal(original, source.StoredData);
         Assert.Throws<InvalidDataException>(() => new PokemonTransfer().Prepare(plan.Pokemon, "hgss"));
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Insert(Gen4Fixtures.Create(GameVersion.SS), new(false, 0, 0), plan.Pokemon.StoredData, "pk5"));
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Insert(Gen4Fixtures.Create(GameVersion.SS), new(false, 0, 0), plan.Pokemon.StoredData, "pk5"));
     }
 
     [Theory]
@@ -55,7 +55,7 @@ public sealed class GenerationTransferTests
         if (condition == "hm") pk.Move1 = 57;
         var source = Pokemon(pk); var original = source.StoredData.ToArray();
         var target = Gen5Fixtures.Create(GameVersion.B); var before = target.ToArray();
-        Assert.Throws<InvalidDataException>(() => new DsSaveEditor().Insert(target, new(false, 0, 0), source.StoredData, "pk4", condition == "date" ? null : Date));
+        Assert.Throws<InvalidDataException>(() => new GameSaveEditor().Insert(target, new(false, 0, 0), source.StoredData, "pk4", condition == "date" ? null : Date));
         Assert.Equal(original, source.StoredData); Assert.Equal(before, target);
     }
 }
