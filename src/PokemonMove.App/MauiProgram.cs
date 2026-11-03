@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PokemonMove.Domain;
 using PokemonMove.Engine;
+using PokemonMove.Infrastructure;
 
 namespace PokemonMove.App;
 
@@ -12,6 +13,9 @@ public static class MauiProgram
     private static MauiAppBuilder ConfigureServices(this MauiAppBuilder builder)
     {
         builder.Services.AddSingleton<ISaveReader, HgssSaveReader>();
+        builder.Services.AddSingleton<IPokemonCodec, HgssPokemonCodec>();
+        builder.Services.AddSingleton<IBankStore>(services => new LocalBankStore(
+            Path.Combine(FileSystem.AppDataDirectory, "bank"), services.GetRequiredService<IPokemonCodec>()));
         builder.Services.AddTransient<MainPage>();
         return builder;
     }
@@ -19,5 +23,5 @@ public static class MauiProgram
 
 public sealed class App(MainPage page) : Application
 {
-    protected override Window CreateWindow(IActivationState? activationState) => new(page);
+    protected override Window CreateWindow(IActivationState? activationState) => new(new NavigationPage(page) { BarBackgroundColor = Color.FromArgb("152B36"), BarTextColor = Colors.White });
 }

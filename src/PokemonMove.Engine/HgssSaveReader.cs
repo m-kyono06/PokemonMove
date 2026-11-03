@@ -21,22 +21,9 @@ public sealed class HgssSaveReader : PokemonMove.Domain.ISaveReader
         ValidateDisplayBlocks(hgss);
         var warnings = hgss.ChecksumsValid ? Array.Empty<string>() :
             new[] { "追加領域（バトルビデオ等）のチェックサムに不一致があります。手持ち・ボックスの検証は正常です。表示専用で読み込んでいます。" };
-        var strings = GameInfo.GetStrings("ja");
-        PokemonSummary Describe(PKM p, int slot)
-        {
-            if (p.Species == 0)
-                return new(slot, 0, "空き", "", 0, "", [], false);
-            var personal = p.PersonalInfo;
-            string At(string[] values, int index) => index < values.Length ? values[index] : $"#{index}";
-            var types = new[] { At(strings.types, personal.Type1), At(strings.types, personal.Type2) }.Distinct();
-            return new(slot, p.Species, At(strings.specieslist, p.Species), p.Nickname,
-                p.CurrentLevel, string.Join(" / ", types),
-                new[] { p.Move1, p.Move2, p.Move3, p.Move4 }.Where(m => m != 0)
-                    .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny);
-        }
-        var party = Enumerable.Range(0, hgss.PartyCount).Select(i => Describe(hgss.GetPartySlotAtIndex(i), i)).ToArray();
+        var party = Enumerable.Range(0, hgss.PartyCount).Select(i => HgssPokemonCodec.Describe(hgss.GetPartySlotAtIndex(i), i)).ToArray();
         var boxes = Enumerable.Range(0, hgss.BoxCount).Select(b => new BoxSnapshot(hgss.GetBoxName(b),
-            Enumerable.Range(0, hgss.BoxSlotCount).Select(s => Describe(hgss.GetBoxSlotAtIndex(b, s), s)).ToArray())).ToArray();
+            Enumerable.Range(0, hgss.BoxSlotCount).Select(s => HgssPokemonCodec.Describe(hgss.GetBoxSlotAtIndex(b, s), s)).ToArray())).ToArray();
         return new(hgss.OT, hgss.Version == GameVersion.HG ? "ハートゴールド" : "ソウルシルバー", party, boxes) { Warnings = warnings };
     }
 

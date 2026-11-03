@@ -48,6 +48,8 @@ public class HgssSaveReaderTests
         var party = Assert.Single(result.Party);
         Assert.Equal("チコリータ", party.Name);
         Assert.Equal("チコ", party.Nickname);
+        Assert.True(party.CanStore);
+        Assert.False(result.Boxes[0].Slots[0].CanStore);
         Assert.Equal(12, party.Level);
         Assert.Contains("くさ", party.Type);
         Assert.Contains("たいあたり", party.Moves);

@@ -3,6 +3,8 @@ namespace PokemonMove.Domain;
 public sealed record PokemonSummary(int Slot, ushort Species, string Name, string Nickname,
     int Level, string Type, IReadOnlyList<string> Moves, bool IsShiny)
 {
+    public byte[] StoredData { get; init; } = [];
+    public bool CanStore => Species != 0 && StoredData.Length != 0;
     public string Label => Species == 0 ? "空き" : $"{Name}\nLv.{Level}{(IsShiny ? " ★" : "")}";
 }
 

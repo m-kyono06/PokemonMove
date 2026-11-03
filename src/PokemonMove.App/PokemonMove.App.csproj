@@ -3,10 +3,10 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <OutputType>Exe</OutputType><UseMaui>true</UseMaui><SingleProject>true</SingleProject>
     <ApplicationTitle>PokemonMove</ApplicationTitle><ApplicationId>io.github.mkyono06.pokemonmove</ApplicationId>
-    <ApplicationDisplayVersion>0.1.1</ApplicationDisplayVersion><ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion><ApplicationVersion>3</ApplicationVersion>
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
-  <ItemGroup><PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20"/><ProjectReference Include="../PokemonMove.Engine/PokemonMove.Engine.csproj"/></ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20"/><ProjectReference Include="../PokemonMove.Engine/PokemonMove.Engine.csproj"/><ProjectReference Include="../PokemonMove.Infrastructure/PokemonMove.Infrastructure.csproj"/></ItemGroup>
   <ItemGroup><MauiIcon Include="Resources/AppIcon/appicon.svg" Color="#152B36"/></ItemGroup>
 </Project>

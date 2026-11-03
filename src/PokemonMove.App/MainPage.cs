@@ -7,14 +7,17 @@ public sealed class MainPage : ContentPage
 {
     private readonly ISaveReader reader;
     private SaveSnapshot? snapshot;
+    private readonly IBankStore bank;
+    private bool storing;
     private readonly Label status = new() { Text = "HGSS のセーブを開いて、冒険の仲間を確認しましょう。", TextColor = Color.FromArgb("AFC2CD") };
     private readonly Picker location = new() { Title = "手持ち / ボックス", TextColor = Colors.White, BackgroundColor = Color.FromArgb("233E4B") };
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
 
-    public MainPage(ISaveReader reader)
+    public MainPage(ISaveReader reader, IBankStore bank)
     {
         this.reader = reader;
+        this.bank = bank;
         Title = "PokemonMove";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -22,6 +25,8 @@ public sealed class MainPage : ContentPage
         open.Clicked += OpenSave;
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
+        var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
+        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank));
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
@@ -32,8 +37,8 @@ public sealed class MainPage : ContentPage
                     new Label { Text = "POKEMON MOVE", FontSize = 13, CharacterSpacing = 3, TextColor = Color.FromArgb("61DFC0") },
                     new Label { Text = "冒険の仲間を、ひとつに。", FontSize = 26, FontAttributes = FontAttributes.Bold, TextColor = Colors.White },
                     new Label { Text = "ハートゴールド / ソウルシルバー", TextColor = Color.FromArgb("AFC2CD") },
-                    open, status, location, slots,
-                    new Label { Text = "このバージョンは表示専用です。元のセーブは変更しません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\nバンク・移動・収集図鑑は今後追加予定です。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
+                    open, bankButton, status, location, slots,
+                    new Label { Text = "ポケモンの詳細からバンクへコピーして保管できます。元のセーブは変更しません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\nゲームへの引き出し・移動・収集図鑑は今後追加予定です。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
                 }
             }
         };
@@ -89,9 +94,33 @@ public sealed class MainPage : ContentPage
                 BackgroundColor = Color.FromArgb(p.Species == 0 ? "1C333E" : "294D59"), TextColor = Colors.White,
                 CornerRadius = 8, IsEnabled = p.Species != 0,
             };
-            button.Clicked += async (_, _) => await DisplayAlertAsync(p.Name,
-                $"ニックネーム：{p.Nickname}\nLv.{p.Level}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n\n技\n{string.Join("\n", p.Moves)}", "閉じる");
+            button.Clicked += async (_, _) => await ShowPokemon(p);
             slots.Add(button, p.Slot % 6, p.Slot / 6);
         }
     }
+
+    private async Task ShowPokemon(PokemonSummary pokemon)
+    {
+        if (storing || snapshot is null) return;
+        storing = true;
+        var source = snapshot;
+        try
+        {
+            var detail = BankPage.Detail(pokemon);
+            if (!pokemon.CanStore)
+            {
+                await DisplayAlertAsync(pokemon.Name, detail + "\n\nデータ検証に失敗したため保管できません。", "閉じる");
+                return;
+            }
+            if (!await DisplayAlertAsync(pokemon.Name, detail + "\n\n元のセーブを変更せず、バンクへコピーします。", "バンクにコピーして保管", "閉じる")) return;
+            var result = await bank.AddAsync(pokemon, source.Game, source.TrainerName);
+            await DisplayAlertAsync("ローカルバンク", result.Added ? "保管しました。バンク画面から確認できます。" : "同じデータのポケモンはすでに保管されています。", "閉じる");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            await DisplayAlertAsync("保管できませんでした", ex is InvalidDataException ? ex.Message : "保存先へのアクセスを確認してください。元のセーブは変更していません。", "閉じる");
+        }
+        finally { storing = false; }
+    }
+
 }

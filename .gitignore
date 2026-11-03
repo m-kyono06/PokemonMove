@@ -7,3 +7,6 @@
 *.dsv
 *.bak
 TestResults/
+
+bank.json*
+PokemonMove-bank-*.json
