@@ -46,6 +46,9 @@ public static class DualScreenRouting
         var upper = ids.Contains(0) ? 0 : ids[0];
         return new(ids.First(i => i != upper), upper);
     }
+    // Choose a default only before a route is saved. Never silently replace a saved assignment.
+    public static ScreenRoute? Resolve(ScreenRoute? saved, IReadOnlyList<ScreenPanel> screens) =>
+        saved is null ? Default(screens) : IsValid(saved, screens) ? saved : null;
     public static bool IsValid(ScreenRoute route, IReadOnlyList<ScreenPanel> screens) =>
         route.Controls != route.Inspector && screens.Any(s => s.Id == route.Controls) && screens.Any(s => s.Id == route.Inspector);
 }

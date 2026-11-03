@@ -29,7 +29,7 @@ public sealed class AndroidDualScreenManager(IBankStore bank, IPokemonInspection
             return DualScreenRouting.IsValid(route, Screens) ? route : null;
         }
     }
-    public bool Enabled => Preferences.Default.Get(EnabledKey, false);
+    public bool Enabled => Preferences.Default.Get(EnabledKey, true);
     public bool IsActive => Enabled && !blocked && !suspended && PokemonDisplayActivity.Current is { IsFinishing: false, IsVisible: true };
     public string Status => status;
     public IReadOnlyList<ScreenPanel> Screens
@@ -82,9 +82,22 @@ public sealed class AndroidDualScreenManager(IBankStore bank, IPokemonInspection
     private void Reconcile(MainActivity activity)
     {
         if (!Enabled || blocked || suspended || operations.IsBusy || activity.IsFinishing) return;
-        var route = new ScreenRoute(Preferences.Default.Get(ControlsKey, -1), Preferences.Default.Get(InspectorKey, -1));
-        if (!DualScreenRouting.IsValid(route, Screens))
-        { PokemonDisplayActivity.Current?.Finish(); status = "設定した2つの画面が見つかりません。2画面設定で選び直してください。"; return; }
+        var hasSavedRoute = Preferences.Default.ContainsKey(ControlsKey) || Preferences.Default.ContainsKey(InspectorKey);
+        var saved = hasSavedRoute
+            ? new ScreenRoute(Preferences.Default.Get(ControlsKey, -1), Preferences.Default.Get(InspectorKey, -1)) : null;
+        var route = DualScreenRouting.Resolve(saved, Screens);
+        if (route is null)
+        {
+            PokemonDisplayActivity.Current?.Finish();
+            status = hasSavedRoute ? "設定した2つの画面が見つかりません。2画面設定で選び直してください。"
+                : "2つ目の画面が見つかりません。通常画面で操作できます。2画面を検出すると自動で開始します。";
+            return;
+        }
+        if (!hasSavedRoute)
+        {
+            Preferences.Default.Set(ControlsKey, route.Controls);
+            Preferences.Default.Set(InspectorKey, route.Inspector);
+        }
         var own = DisplayId(activity);
         if (own != route.Controls)
         {

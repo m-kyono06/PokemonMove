@@ -114,6 +114,19 @@ public sealed class InspectionTests
     }
 
     [Fact]
+    public void AutomaticRoutingPreservesSavedAssignmentAndWaitsForMissingScreens()
+    {
+        ScreenPanel[] two = [new(0, "upper", 640, 480), new(1, "lower", 640, 480)];
+        Assert.Equal(new ScreenRoute(1, 0), DualScreenRouting.Resolve(null, two));
+        Assert.Equal(new ScreenRoute(0, 1), DualScreenRouting.Resolve(new(0, 1), two));
+        Assert.Null(DualScreenRouting.Resolve(null, [two[0]]));
+        Assert.Null(DualScreenRouting.Resolve(new(1, 0), [two[0]]));
+        Assert.Null(DualScreenRouting.Resolve(new(2, 0), two));
+        Assert.Null(DualScreenRouting.Resolve(new(0, 0), two));
+        Assert.Equal(new ScreenRoute(1, 0), DualScreenRouting.Resolve(new(1, 0), two));
+    }
+
+    [Fact]
     public void NestedOperationsAllowScreenSwitchOnlyAfterAllWorkAndConfirmationsFinish()
     {
         var operations = new UserOperations(); var idle = 0;

@@ -33,7 +33,7 @@ public sealed class DualScreenSettingsPage : ContentPage
         Content = new ScrollView { Content = new VerticalStackLayout { Padding = 16, Spacing = 12, Children =
         {
             new Label { Text = "下画面で操作、上画面でポケモンを見る", TextColor = Colors.White, FontSize = 22 },
-            new Label { Text = "RGDS・AYN Thorのような独立した2画面向けです。開始すると操作画面を移し、ホームへ戻ります。上下が逆なら入れ替えて開始してください。セーブやバンクの内容は変更しません。", TextColor = Colors.LightGray },
+            new Label { Text = "RGDS・AYN Thorのような独立した2画面向けです。初期設定では2画面を検出すると自動で開始します。停止した場合は、ここで再開できます。開始すると操作画面を移し、ホームへ戻ります。上下が逆なら入れ替えて開始してください。セーブやバンクの内容は変更しません。", TextColor = Colors.LightGray },
             status, controls, inspector, swap, start, stop, refresh,
             new Label { Text = "アプリを別のアプリやホームへ切り替えると上画面の表示を閉じ、復帰時に再表示します。1画面しか検出されない場合は、通常画面のまま操作できます。", FontSize = 12, TextColor = Colors.LightGray }
         }}};
