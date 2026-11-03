@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [.github/workflows/development-release.yml]
+    paths: [.github/workflows/development-release.yml, src/PokemonMove.App/PokemonMove.App.csproj]
 permissions:
   contents: write
 concurrency:
-  group: pokemonmove-v0.1.0-release
+  group: pokemonmove-development-release
   cancel-in-progress: false
 jobs:
   release:
@@ -38,23 +38,31 @@ jobs:
           -p:RuntimeIdentifier=android-arm64
           -p:AndroidSdkDirectory="$ANDROID_HOME"
           -p:JavaSdkDirectory="$JAVA_HOME"
+      - name: Read app version
+        run: |
+          VERSION=$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("src/PokemonMove.App/PokemonMove.App.csproj").findtext(".//ApplicationDisplayVersion"))')
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
       - name: Prepare distribution
         run: |
           mkdir -p dist
-          cp src/PokemonMove.App/bin/Debug/net10.0-android/android-arm64/io.github.mkyono06.pokemonmove-Signed.apk dist/PokemonMove-v0.1.0-android-arm64.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify dist/PokemonMove-v0.1.0-android-arm64.apk
-          git archive --format=tar.gz --prefix=PokemonMove-v0.1.0/ HEAD -o dist/PokemonMove-v0.1.0-source.tar.gz
+          cp src/PokemonMove.App/bin/Debug/net10.0-android/android-arm64/io.github.mkyono06.pokemonmove-Signed.apk dist/PokemonMove-${{ env.TAG }}-android-arm64.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify dist/PokemonMove-${{ env.TAG }}-android-arm64.apk
+          git archive --format=tar.gz --prefix=PokemonMove-${{ env.TAG }}/ HEAD -o dist/PokemonMove-${{ env.TAG }}-source.tar.gz
           curl --fail --location https://codeload.github.com/kwsch/PKHeX/tar.gz/refs/tags/26.10.18 -o dist/PKHeX-26.10.18-source.tar.gz
           cd dist
           sha256sum *.apk *.tar.gz > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: PokemonMove-v0.1.0
+          name: PokemonMove-${{ env.TAG }}
           path: dist/*
       - name: Upload and publish development release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v0.1.0 --json isDraft --jq '.isDraft' | grep -qx true
-          gh release upload v0.1.0 dist/* --clobber
-          gh release edit v0.1.0 --target "$GITHUB_SHA" --prerelease --draft=false
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "PokemonMove $TAG — HGSS 開発版" --notes-file "docs/releases/$TAG.md" --prerelease --draft
+          fi
+          gh release view "$TAG" --json isDraft --jq '.isDraft' | grep -qx true
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --target "$GITHUB_SHA" --prerelease --draft=false

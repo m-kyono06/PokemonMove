@@ -41,6 +41,7 @@ public class HgssSaveReaderTests
         var result = new HgssSaveReader().Read(bytes);
         Assert.Equal(original, bytes);
         Assert.Equal(title, result.Game);
+        Assert.Empty(result.Warnings);
         Assert.Equal("ヒビキ", result.TrainerName);
         Assert.Equal(18, result.Boxes.Count);
         Assert.All(result.Boxes, box => Assert.Equal(30, box.Slots.Count));
@@ -93,4 +94,72 @@ public class HgssSaveReaderTests
         bytes[0x100] ^= 0xFF;
         Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(bytes));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReadsDisplayDataWithWarningWhenOnlyExtraBlockIsDamaged(bool dsv)
+    {
+        var save = CreateSave(GameVersion.SS);
+        save.OT = "コトネ";
+        save.SetPartySlotAtIndex(new PK4 { Species = 158, CurrentLevel = 10 }, 0);
+        var raw = save.Write().ToArray();
+        raw[0x27010] ^= 0xFF; // Battle video, outside general/storage blocks.
+        Assert.False(new SAV4HGSS(raw.ToArray()).ChecksumsValid);
+        var data = raw;
+        if (dsv)
+        {
+            data = new byte[raw.Length + 0x7A];
+            raw.CopyTo(data, 0);
+            "|-DESMUME SAVE-|"u8.CopyTo(data.AsSpan(data.Length - "|-DESMUME SAVE-|"u8.Length));
+        }
+        var before = data.ToArray();
+        var result = new HgssSaveReader().Read(data);
+        Assert.Equal("コトネ", result.TrainerName);
+        Assert.Equal((ushort)158, Assert.Single(result.Party).Species);
+        Assert.Single(result.Warnings);
+        Assert.Equal(before, data);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(0, 1)]
+    [InlineData(0xF700, 0)]
+    [InlineData(0xF700, 1)]
+    public void RejectsCorruptActiveDisplayBlock(int start, int partition)
+    {
+        var bytes = CreateSave(GameVersion.SS).Write().ToArray();
+        var size = start == 0 ? SAV4HGSS.GeneralSize : 0x12310;
+        // Select this partition independently for each block, matching PKHeX.
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+            bytes.AsSpan(partition * 0x40000 + start + size - 0x14, 4), 10);
+        bytes[partition * 0x40000 + start + 0x100] ^= 0xFF;
+        var error = Assert.Throws<InvalidDataException>(() => new HgssSaveReader().Read(bytes));
+        Assert.Contains(start == 0 ? "主人公・手持ち" : "ボックス", error.Message);
+    }
+
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, 1)]
+    public void ValidatesIndependentlySelectedGeneralAndStoragePartitions(int general, int storage)
+    {
+        var bytes = CreateSave(GameVersion.SS).Write().ToArray();
+        bytes.AsSpan(0, 0x40000).CopyTo(bytes.AsSpan(0x40000));
+        foreach (var (partition, start, size) in new[]
+        {
+            (general, 0, SAV4HGSS.GeneralSize), (storage, 0xF700, 0x12310)
+        })
+        {
+            var block = bytes.AsSpan(partition * 0x40000 + start, size);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(block[^0x14..], 10);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(block[^2..],
+                Checksums.CRC16_CCITT(block[..^0x10]));
+        }
+        var result = new HgssSaveReader().Read(bytes);
+        Assert.Equal("ソウルシルバー", result.Game);
+        Assert.Empty(result.Warnings);
+    }
+
 }

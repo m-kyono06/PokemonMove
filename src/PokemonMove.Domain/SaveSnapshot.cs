@@ -8,7 +8,10 @@ public sealed record PokemonSummary(int Slot, ushort Species, string Name, strin
 
 public sealed record BoxSnapshot(string Name, IReadOnlyList<PokemonSummary> Slots);
 public sealed record SaveSnapshot(string TrainerName, string Game,
-    IReadOnlyList<PokemonSummary> Party, IReadOnlyList<BoxSnapshot> Boxes);
+    IReadOnlyList<PokemonSummary> Party, IReadOnlyList<BoxSnapshot> Boxes)
+{
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 
 public interface ISaveReader
 {

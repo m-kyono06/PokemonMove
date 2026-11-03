@@ -65,7 +65,8 @@ public sealed class MainPage : ContentPage
             foreach (var box in loaded.Boxes) location.Items.Add(box.Name);
             location.IsVisible = true;
             location.SelectedIndex = 0;
-            status.Text = $"{loaded.Game}\nトレーナー：{loaded.TrainerName}";
+            status.Text = $"{loaded.Game}\nトレーナー：{loaded.TrainerName}" +
+                (loaded.Warnings.Count == 0 ? "" : "\n\n注意：" + string.Join("\n", loaded.Warnings));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
