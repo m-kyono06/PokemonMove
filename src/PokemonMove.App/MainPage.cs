@@ -13,6 +13,8 @@ public sealed class MainPage : ContentPage
     private bool loading;
     private readonly ISaveDocuments documents;
     private readonly ICollectionDex dex;
+    private readonly IRegisteredSaves registry;
+    private readonly ISaveLibraryReader library;
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
     private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っているHGSSのセーブを選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
@@ -20,12 +22,14 @@ public sealed class MainPage : ContentPage
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
 
-    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex)
+    public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex, IRegisteredSaves registry, ISaveLibraryReader library)
     {
         this.reader = reader;
         this.bank = bank;
         this.documents = documents;
         this.dex = dex;
+        this.registry = registry;
+        this.library = library;
         Title = "PokemonMove";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -34,12 +38,18 @@ public sealed class MainPage : ContentPage
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
         var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
-        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader));
+        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader, registry));
         var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
         dexButton.Clicked += async (_, _) =>
         {
             if (loading || storing) return;
-            await Navigation.PushAsync(new CollectionPage(bank, reader, dex, sourceDocument));
+            await Navigation.PushAsync(new CollectionPage(bank, dex, library));
+        };
+        var libraryButton = new Button { Text = "登録セーブを管理", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
+        libraryButton.Clicked += async (_, _) =>
+        {
+            if (loading || storing) return;
+            await Navigation.PushAsync(new SaveLibraryPage(registry, documents, reader));
         };
         Content = new ScrollView
         {
@@ -51,7 +61,7 @@ public sealed class MainPage : ContentPage
                     new Label { Text = "POKEMON MOVE", FontSize = 13, CharacterSpacing = 3, TextColor = Color.FromArgb("61DFC0") },
                     new Label { Text = "冒険の仲間を、ひとつに。", FontSize = 26, FontAttributes = FontAttributes.Bold, TextColor = Colors.White },
                     new Label { Text = "ハートゴールド / ソウルシルバー", TextColor = Color.FromArgb("AFC2CD") },
-                    open, bankButton, dexButton, status, location, slots,
+                    open, bankButton, dexButton, libraryButton, status, location, slots,
                     new Label { Text = "移動前にエミュレータを終了してください。選択したセーブを書き換えます。別のコピーを選ぶと、エミュレータ側の元データは変わりません。\n\nmelonDS：通常の .sav\nDraStic：バッテリーセーブの .dsv\nステートセーブには対応していません。\n\n保管時は元の枠から取り除き、引き出し時はバンクから取り除きます。バックアップはバンク画面から書き出せます。", FontSize = 13, TextColor = Color.FromArgb("AFC2CD") }
                 }
             }
@@ -71,6 +81,7 @@ public sealed class MainPage : ContentPage
             status.Text = "セーブを読み込み中…";
             var data = await file.ReadAsync();
             var loaded = await Task.Run(() => reader.Read(data));
+            await registry.RegisterAsync(file.Id, loaded);
             sourceDocument = file;
             sourceHash = SHA256.HashData(data);
             snapshot = loaded;

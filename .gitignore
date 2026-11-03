@@ -10,3 +10,6 @@ TestResults/
 
 bank.json*
 PokemonMove-bank-*.json
+
+registered-saves.json*
+PokemonMove-saves-*.json

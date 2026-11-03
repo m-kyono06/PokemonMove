@@ -2,9 +2,11 @@ namespace PokemonMove.Domain;
 
 public enum DexVariant { All, Normal, Shiny }
 public enum DexOwnership { All, Owned, Missing }
+public sealed record DexSaveLocation(int SourceNumber, string Game, string Trainer, int PartyCount, int BoxCount, int ShinyPartyCount, int ShinyBoxCount);
 public sealed record DexEntry(ushort Species, string Name, int PartyCount, int BoxCount, int BankCount,
     int ShinyPartyCount, int ShinyBoxCount, int ShinyBankCount)
 {
+    public IReadOnlyList<DexSaveLocation> Saves { get; init; } = [];
     public int Count(DexVariant variant) => CountAt(PartyCount + BoxCount + BankCount,
         ShinyPartyCount + ShinyBoxCount + ShinyBankCount, variant);
     public int Party(DexVariant variant) => CountAt(PartyCount, ShinyPartyCount, variant);
@@ -17,10 +19,12 @@ public sealed record DexEntry(ushort Species, string Name, int PartyCount, int B
 }
 public sealed record CollectionDexSnapshot(IReadOnlyList<DexEntry> Entries, bool IncludesSave)
 {
+    public int SaveCount { get; init; }
     public int Owned(DexVariant variant) => Entries.Count(e => e.Count(variant) > 0);
 }
 public interface ICollectionDex
 {
     CollectionDexSnapshot Build(SaveSnapshot? save, IReadOnlyList<BankItem> bank);
+    CollectionDexSnapshot BuildAll(IReadOnlyList<SaveSnapshot> saves, IReadOnlyList<BankItem> bank);
     IReadOnlyList<DexEntry> Filter(CollectionDexSnapshot dex, DexVariant variant, DexOwnership ownership, string query);
 }

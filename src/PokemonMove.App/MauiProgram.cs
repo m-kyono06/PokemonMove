@@ -18,6 +18,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IBankStore>(services => new LocalBankStore(
             Path.Combine(FileSystem.AppDataDirectory, "bank"), services.GetRequiredService<IPokemonCodec>(), new HgssSaveEditor()));
         builder.Services.AddSingleton<ISaveDocuments, AndroidSaveDocuments>();
+        builder.Services.AddSingleton<IRegisteredSaves>(_ => new LocalRegisteredSaves(Path.Combine(FileSystem.AppDataDirectory, "saves")));
+        builder.Services.AddSingleton<ISaveLibraryReader, RegisteredSaveLibraryReader>();
         builder.Services.AddTransient<MainPage>();
         return builder;
     }

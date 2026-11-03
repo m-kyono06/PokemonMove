@@ -12,6 +12,7 @@ public interface ISaveDocument
 public interface ISaveDocuments
 {
     Task<ISaveDocument?> PickAsync();
+    ISaveDocument Open(string documentId);
 }
 public interface ISaveEditor
 {

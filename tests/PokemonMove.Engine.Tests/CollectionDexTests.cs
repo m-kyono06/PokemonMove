@@ -106,4 +106,26 @@ public sealed class CollectionDexTests
         Assert.Equal(1, result.Owned(DexVariant.All));
         Assert.Equal(original, p.StoredData);
     }
+
+    [Fact]
+    public void AllRegisteredSavesAndBankAreAggregatedWithPerSaveLocations()
+    {
+        var ss = Save([Pokemon(152)], Pokemon(25, shiny: true)) with { Game = "SS", TrainerName = "SS-PLAYER" };
+        var hg = Save([Pokemon(155)], Pokemon(152)) with { Game = "HG", TrainerName = "HG-PLAYER" };
+        var result = dex.BuildAll([ss, hg], [Bank(Pokemon(158)), Bank(Pokemon(152))]);
+        Assert.Equal(2, result.SaveCount);
+        Assert.Equal(4, result.Owned(DexVariant.All));
+        Assert.Equal(1, result.Owned(DexVariant.Shiny));
+        var chikorita = result.Entries[151];
+        Assert.Equal(3, chikorita.Count(DexVariant.All));
+        Assert.Equal(2, chikorita.Saves.Count);
+        Assert.Equal("SS", chikorita.Saves[0].Game);
+        Assert.Equal(1, chikorita.Saves[0].PartyCount);
+        Assert.Equal("HG", chikorita.Saves[1].Game);
+        Assert.Equal(1, chikorita.Saves[1].BoxCount);
+        Assert.Equal(1, result.Entries[24].Saves[0].ShinyBoxCount);
+        // Repeated updates are recomputed, never appended to an old collection.
+        Assert.Equal(result.Owned(DexVariant.All), dex.BuildAll([ss, hg], [Bank(Pokemon(158)), Bank(Pokemon(152))]).Owned(DexVariant.All));
+    }
+
 }

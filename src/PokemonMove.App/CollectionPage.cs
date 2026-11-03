@@ -5,11 +5,11 @@ namespace PokemonMove.App;
 public sealed class CollectionPage : ContentPage
 {
     private readonly IBankStore bank;
-    private readonly ISaveReader reader;
+    private readonly ISaveLibraryReader library;
     private readonly ICollectionDex dex;
-    private readonly ISaveDocument? source;
     private CollectionDexSnapshot? snapshot;
     private bool loading;
+    private bool active;
     private readonly Label summary = new() { TextColor = Colors.White, FontSize = 16 };
     private readonly Label scope = new() { TextColor = Colors.LightGray, FontSize = 12 };
     private readonly ProgressBar progress = new() { ProgressColor = Color.FromArgb("61DFC0") };
@@ -20,9 +20,9 @@ public sealed class CollectionPage : ContentPage
     private readonly Label empty = new() { TextColor = Colors.LightGray, Margin = 12 };
     private readonly CollectionView entries = new() { SelectionMode = SelectionMode.Single };
 
-    public CollectionPage(IBankStore bank, ISaveReader reader, ICollectionDex dex, ISaveDocument? source)
+    public CollectionPage(IBankStore bank, ICollectionDex dex, ISaveLibraryReader library)
     {
-        this.bank = bank; this.reader = reader; this.dex = dex; this.source = source;
+        this.bank = bank; this.dex = dex; this.library = library;
         Title = "収集図鑑";
         BackgroundColor = Color.FromArgb("152B36");
         entries.ItemTemplate = new DataTemplate(() =>
@@ -43,7 +43,7 @@ public sealed class CollectionPage : ContentPage
             entries.SelectedItem = null;
             var p = row.Entry;
             await DisplayAlertAsync(row.Title,
-                $"現在の所持先\n手持ち：{p.PartyCount}匹（色違い{p.ShinyPartyCount}匹）\nボックス：{p.BoxCount}匹（色違い{p.ShinyBoxCount}匹）\nバンク：{p.BankCount}件（色違い{p.ShinyBankCount}件）\n\nバンクは旧版のコピー保管も含みます。図鑑では同じ種類を1種類として数えます。", "閉じる");
+                $"現在の所持先\n手持ち：{p.PartyCount}匹（色違い{p.ShinyPartyCount}匹）\nボックス：{p.BoxCount}匹（色違い{p.ShinyBoxCount}匹）\nバンク：{p.BankCount}件（色違い{p.ShinyBankCount}件）\n\nセーブ別\n{string.Join("\n", p.Saves.Select(s => $"#{s.SourceNumber} {s.Game} / {s.Trainer}：手持ち{s.PartyCount}(★{s.ShinyPartyCount})・ボックス{s.BoxCount}(★{s.ShinyBoxCount})"))}\n\nバンクは旧版のコピー保管も含みます。図鑑では同じ種類を1種類として数えます。", "閉じる");
         };
         variant.SelectedIndexChanged += (_, _) => Filter();
         ownership.SelectedIndexChanged += (_, _) => Filter();
@@ -67,8 +67,11 @@ public sealed class CollectionPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        active = true;
         await Refresh();
     }
+
+    protected override void OnDisappearing() { active = false; base.OnDisappearing(); }
 
     private async Task Refresh()
     {
@@ -80,20 +83,22 @@ public sealed class CollectionPage : ContentPage
         try
         {
             if (await bank.HasPendingMoveAsync()) throw new InvalidDataException("中断した移動があります。バンク画面で復旧してから図鑑を更新してください。");
+            var bankBefore = await Task.Run(bank.ExportAsync);
             var stored = await Task.Run(bank.ListAsync);
-            SaveSnapshot? save = null;
-            if (source is not null)
-            {
-                var data = await source.ReadAsync();
-                save = await Task.Run(() => reader.Read(data));
-            }
-            snapshot = await Task.Run(() => dex.Build(save, stored));
-            scope.Text = save is null ? "集計対象：バンクのみ・旧コピー含む（ホームでセーブを開くと追加されます）" : $"集計対象：現在の{save.Game}の手持ち・ボックス ＋ バンク（旧コピー含む）";
-            if (save?.Warnings.Count > 0) scope.Text += "\nセーブの追加領域に警告があります。";
+            var saves = await library.ReadAllAsync();
+            var bankAfter = await Task.Run(bank.ExportAsync);
+            if (!bankBefore.AsSpan().SequenceEqual(bankAfter))
+                throw new InvalidDataException("集計中にバンクの内容が更新されました。もう一度図鑑を更新してください。");
+            var loaded = await Task.Run(() => dex.BuildAll(saves, stored));
+            if (!active) return;
+            snapshot = loaded;
+            scope.Text = saves.Count == 0 ? "集計対象：バンクのみ・旧コピー含む（ホームからセーブを登録できます）" : $"集計対象：登録済み{saves.Count}セーブの手持ち・ボックス ＋ バンク（旧コピー含む）";
+            if (saves.Any(s => s.Warnings.Count > 0)) scope.Text += "\n追加領域に警告のあるセーブを含みます。";
             Filter();
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
+            if (!active) return;
             empty.Text = "集計結果を表示できません。";
             snapshot = null; entries.ItemsSource = Array.Empty<Row>();
             summary.Text = "所持状況を集計できませんでした。";
@@ -111,8 +116,8 @@ public sealed class CollectionPage : ContentPage
         var kind = (DexVariant)variant.SelectedIndex;
         var state = (DexOwnership)ownership.SelectedIndex;
         var owned = snapshot.Owned(kind);
-        summary.Text = $"所持 {owned} / 493種類  ({owned / 493d:P1})\n全体 {snapshot.Owned(DexVariant.All)}・通常色 {snapshot.Owned(DexVariant.Normal)}・色違い {snapshot.Owned(DexVariant.Shiny)}";
-        progress.IsVisible = true; progress.Progress = owned / 493d;
+        summary.Text = $"所持 {owned} / {snapshot.Entries.Count}種類  ({owned / (double)snapshot.Entries.Count:P1})\n全体 {snapshot.Owned(DexVariant.All)}・通常色 {snapshot.Owned(DexVariant.Normal)}・色違い {snapshot.Owned(DexVariant.Shiny)}";
+        progress.IsVisible = true; progress.Progress = owned / (double)snapshot.Entries.Count;
         entries.ItemsSource = dex.Filter(snapshot, kind, state, search.Text ?? "").Select(p => new Row(p, kind)).ToArray();
     }
 

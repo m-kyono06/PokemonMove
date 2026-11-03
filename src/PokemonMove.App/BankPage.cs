@@ -9,6 +9,7 @@ public sealed class BankPage : ContentPage
     private readonly IBankStore bank;
     private readonly ISaveDocuments documents;
     private readonly ISaveReader reader;
+    private readonly IRegisteredSaves registry;
     private bool pendingMove;
     private IReadOnlyList<BankItem> items = [];
     private List<BankItem> filtered = [];
@@ -22,11 +23,12 @@ public sealed class BankPage : ContentPage
     private readonly Button recover = ActionButton("中断した移動を復旧する");
     private readonly Button exportSave = ActionButton("直前のセーブのバックアップを書き出す");
 
-    public BankPage(IBankStore bank, ISaveDocuments documents, ISaveReader reader)
+    public BankPage(IBankStore bank, ISaveDocuments documents, ISaveReader reader, IRegisteredSaves registry)
     {
         this.bank = bank;
         this.documents = documents;
         this.reader = reader;
+        this.registry = registry;
         Title = "ローカルバンク";
         BackgroundColor = Color.FromArgb("152B36");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -157,6 +159,7 @@ public sealed class BankPage : ContentPage
         if (target is null) return;
         var data = await target.ReadAsync();
         var save = await Task.Run(() => reader.Read(data));
+        await registry.RegisterAsync(target.Id, save);
         var choices = save.Boxes.Select((b, i) => $"{i + 1}: {b.Name}（空き{b.Slots.Count(p => p.Species == 0)}）").ToArray();
         var selected = await DisplayActionSheetAsync($"{save.Game} / {save.TrainerName} の引き出し先", "キャンセル", null, choices);
         var index = Array.IndexOf(choices, selected);

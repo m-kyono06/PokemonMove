@@ -13,6 +13,7 @@ public sealed record BoxSnapshot(string Name, IReadOnlyList<PokemonSummary> Slot
 public sealed record SaveSnapshot(string TrainerName, string Game,
     IReadOnlyList<PokemonSummary> Party, IReadOnlyList<BoxSnapshot> Boxes)
 {
+    public string FormatKey { get; init; } = "hgss";
     public IReadOnlyList<string> Warnings { get; init; } = [];
 }
 

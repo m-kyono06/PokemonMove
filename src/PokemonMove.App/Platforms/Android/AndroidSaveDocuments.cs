@@ -6,6 +6,14 @@ namespace PokemonMove.App;
 
 public sealed class AndroidSaveDocuments : ISaveDocuments
 {
+    public ISaveDocument Open(string documentId)
+    {
+        var uri = Android.Net.Uri.Parse(documentId);
+        if (uri is null || !string.Equals(uri.Scheme, "content", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(uri.Authority) || string.IsNullOrWhiteSpace(uri.Path))
+            throw new InvalidDataException("セーブの登録情報が不正です。ファイルを選び直してください。");
+        return new AndroidSaveDocument(uri);
+    }
+
     public Task<ISaveDocument?> PickAsync() => MainThread.InvokeOnMainThreadAsync(() =>
         (Platform.CurrentActivity as MainActivity ?? throw new IOException("画面を開き直してください。")).PickSaveAsync());
 }
@@ -23,11 +31,11 @@ internal sealed class AndroidSaveDocument(Android.Net.Uri uri) : ISaveDocument
             var buffer = new byte[8192];
             int count;
             while ((count = await stream.ReadAsync(buffer)) != 0)
-        {
+            {
                 if (memory.Length + count > HgssSaveReader.MaximumFileSize) throw new InvalidDataException("HGSSの通常セーブを選択してください。");
                 memory.Write(buffer, 0, count);
-        }
-        return memory.ToArray();
+            }
+            return memory.ToArray();
         }
         catch (Java.Lang.Exception ex) { throw new IOException("Androidからセーブを読み取れません。保存場所と権限を確認してください。", ex); }
     }
