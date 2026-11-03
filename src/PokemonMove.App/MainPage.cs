@@ -24,7 +24,7 @@ public sealed class MainPage : ContentPage
     private readonly Button deposit = new() { Text = "選択したポケモンをバンクへ移動", IsEnabled = false, FontSize = 13, BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 12 };
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
-    private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っている対応作品のセーブ（DS通常セーブ／XY・ORASのmain）を選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
+    private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っている対応作品のセーブ（DS通常セーブ／XY・ORAS・サンムーンのmain）を選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
     private readonly Picker location = new() { Title = "手持ち / ボックス", TextColor = Colors.White, BackgroundColor = Color.FromArgb("233E4B") };
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };

@@ -4,7 +4,7 @@
   "path": "sprites/pokemon/{shiny/}{species}.png",
   "species": [
     1,
-    721
+    802
   ],
-  "image_count": 1442
+  "image_count": 1604
 }

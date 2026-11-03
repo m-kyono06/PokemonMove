@@ -9,6 +9,8 @@ public sealed class PokemonTransfer
     public PokemonTransferPlan Prepare(PokemonSummary pokemon, string targetFormat, DateOnly? transferDate = null, TransferTrainerProfile? trainer = null)
     {
         var source = new PokemonCodec().Decode(pokemon.StoredData, pokemon.FormatKey);
+        if (targetFormat == "sm") return PrepareGen7(source, trainer);
+        if (source.FormatKey == "pk7") throw new InvalidDataException("第7世代の個体は以前の作品へ戻せません。個体はバンクに残っています。");
         if (targetFormat is "xy" or "oras") return PrepareGen6(source, trainer);
         if (source.FormatKey == "pk6") throw new InvalidDataException("第6世代の個体をDS作品へ戻すことはできません。個体はバンクに残っています。");
         var target5 = targetFormat is "bw" or "b2w2";
@@ -76,6 +78,32 @@ public sealed class PokemonTransfer
         if (new[] { pk5.EV_HP, pk5.EV_ATK, pk5.EV_DEF, pk5.EV_SPA, pk5.EV_SPD, pk5.EV_SPE }.Any(ev => ev > 252))
             notices.Add("252を超える能力の努力値は、第6世代の上限252へ調整します。");
         return new(new Gen6PokemonCodec().Decode(data), true, notices);
+    }
+
+    private static PokemonTransferPlan PrepareGen7(PokemonSummary source, TransferTrainerProfile? trainer)
+    {
+        if (source.FormatKey == "pk7") return new(source, false, []);
+        if (source.FormatKey != "pk6") throw new InvalidDataException("先にXY・ORASを経由してからサン・ムーンへ移動してください。");
+        if (trainer is null || string.IsNullOrWhiteSpace(trainer.Name)) throw new InvalidDataException("移動先のトレーナー情報を確認できません。");
+        var pk6 = new PK6(source.StoredData.ToArray());
+        if (pk6.IsEgg) throw new InvalidDataException("タマゴは第7世代へ移動できません。ゲーム内で孵化させてください。");
+        if (pk6.HeldItem != 0) throw new InvalidDataException("第7世代へ移動する前に、元のゲーム内で持ち物を外してください。");
+        if ((pk6.Species == (ushort)Species.Kyurem && pk6.Form != 0)
+            || (pk6.Species == (ushort)Species.Furfrou && pk6.Form != 0) || FormInfo.IsBattleOnlyForm(pk6.Species, pk6.Form, 6))
+            throw new InvalidDataException("このフォルムはゲーム内で通常の姿に戻してから移動してください。");
+        var pk7 = pk6.ConvertToPK7();
+        pk7.HandlingTrainerTrash.Clear(); pk7.HandlingTrainerName = trainer.Name;
+        pk7.HandlingTrainerGender = trainer.Gender; pk7.CurrentHandler = 1;
+        pk7.HandlingTrainerFriendship = pk7.PersonalInfo.BaseFriendship;
+        // ConvertToPK7 creates a random memory; fix it so a journal can reproduce identical bytes later.
+        pk7.HandlingTrainerMemoryFeeling = (byte)(pk7.EncryptionConstant % 10);
+        var bytes = new byte[pk7.SIZE_STORED];pk7.WriteEncryptedDataStored(bytes);
+        return new(new Gen7PokemonCodec().Decode(bytes), true,
+        [
+            "第7世代へ変換します。以前の作品へは戻せません。",
+            "親ID・個体値・努力値・性格・色違い状態・出会った情報を保持します。",
+            "マーキング・特性・なつき度・思い出・リフレ等の情報と技のPPを第7世代の仕様へ合わせ、移動先のトレーナー情報を設定します。能力値は第7世代の種族値・特性で計算します。",
+        ]);
     }
 
 }

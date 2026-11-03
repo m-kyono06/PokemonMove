@@ -4,7 +4,7 @@ using PokemonMove.Domain;
 
 namespace PokemonMove.Engine;
 
-/// <summary>Current ownership, not the game's seen/caught flags. All supported national species (1..721).</summary>
+/// <summary>Current ownership, not the game's seen/caught flags. All supported national species (1..802).</summary>
 public sealed class CollectionDex : ICollectionDex
 {
     public CollectionDexSnapshot Build(SaveSnapshot? save, IReadOnlyList<BankItem> bank)
@@ -12,21 +12,21 @@ public sealed class CollectionDex : ICollectionDex
 
     public CollectionDexSnapshot BuildAll(IReadOnlyList<SaveSnapshot> saves, IReadOnlyList<BankItem> bank)
     {
-        var counts = new int[722, 6];
-        var locations = Enumerable.Range(0, 722).Select(_ => new List<DexSaveLocation>()).ToArray();
+        var counts = new int[803, 6];
+        var locations = Enumerable.Range(0, 803).Select(_ => new List<DexSaveLocation>()).ToArray();
         for (var index = 0; index < saves.Count; index++)
         {
             var save = saves[index];
-            var local = new int[722, 4];
+            var local = new int[803, 4];
             Add(save.Party, 0, local);
             Add(save.Boxes.SelectMany(b => b.Slots), 1, local);
-            for (var i = 1; i <= 721; i++)
+            for (var i = 1; i <= 802; i++)
                 if (local[i, 0] + local[i, 1] != 0)
                     locations[i].Add(new(index + 1, save.Game, save.TrainerName, local[i, 0], local[i, 1], local[i, 2], local[i, 3]));
         }
         Add(bank.Select(i => i.Pokemon), 2, null);
         var names = GameInfo.GetStrings("ja").specieslist;
-        return new(Enumerable.Range(1, 721).Select(i => new DexEntry((ushort)i, names[i],
+        return new(Enumerable.Range(1, 802).Select(i => new DexEntry((ushort)i, names[i],
             counts[i, 0], counts[i, 1], counts[i, 2], counts[i, 3], counts[i, 4], counts[i, 5])
             { Saves = locations[i].ToArray() }).ToArray(), saves.Count != 0) { SaveCount = saves.Count };
 
@@ -34,8 +34,8 @@ public sealed class CollectionDex : ICollectionDex
         {
             foreach (var p in pokemon)
             {
-                if (p.Species is 0 or > 721 || p.IsEgg || !p.CanStore
-                    || p.FormatKey is not ("pk4" or "pk5" or "pk6") || (p.FormatKey == "pk4" && p.Species > 493) || (p.FormatKey == "pk5" && p.Species > 649)) continue;
+                if (p.Species is 0 or > 802 || p.IsEgg || !p.CanStore
+                    || p.FormatKey is not ("pk4" or "pk5" or "pk6" or "pk7") || (p.FormatKey == "pk4" && p.Species > 493) || (p.FormatKey == "pk5" && p.Species > 649) || (p.FormatKey == "pk6" && p.Species > 721)) continue;
                 counts[p.Species, source]++;
                 if (p.IsShiny) counts[p.Species, source + 3]++;
                 if (local is null) continue;

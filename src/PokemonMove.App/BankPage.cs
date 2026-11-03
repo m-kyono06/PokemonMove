@@ -100,7 +100,7 @@ public sealed class BankPage : ContentPage
             Children =
             {
                 status, search, box, slots, selected, withdraw,
-                new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5世代、第5→第6世代は一方向の変換です。前の世代へは戻せません。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
+                new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5、第5→第6、第6→第7世代は一方向の変換です。前の世代へは戻せません。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
         }};
@@ -206,7 +206,7 @@ public sealed class BankPage : ContentPage
     {
         var d = p.Details;
         var stats = d is null ? "" : $"\nHP {d.Stats.HP} / 攻撃 {d.Stats.Attack} / 防御 {d.Stats.Defense}\n特攻 {d.Stats.SpecialAttack} / 特防 {d.Stats.SpecialDefense} / 素早さ {d.Stats.Speed}";
-        var training = d is null ? "" : $"\n努力値（合計 {d.TotalEffortValues}）\nHP {d.EffortValues.HP} / 攻撃 {d.EffortValues.Attack} / 防御 {d.EffortValues.Defense}\n特攻 {d.EffortValues.SpecialAttack} / 特防 {d.EffortValues.SpecialDefense} / 素早さ {d.EffortValues.Speed}\n個体値（{d.PerfectIVCount}V）\nHP {d.IndividualValues.HP} / 攻撃 {d.IndividualValues.Attack} / 防御 {d.IndividualValues.Defense}\n特攻 {d.IndividualValues.SpecialAttack} / 特防 {d.IndividualValues.SpecialDefense} / 素早さ {d.IndividualValues.Speed}\n親のID：{d.OriginalTrainerId:D5}";
+        var training = d is null ? "" : $"\n努力値（合計 {d.TotalEffortValues}）\nHP {d.EffortValues.HP} / 攻撃 {d.EffortValues.Attack} / 防御 {d.EffortValues.Defense}\n特攻 {d.EffortValues.SpecialAttack} / 特防 {d.EffortValues.SpecialDefense} / 素早さ {d.EffortValues.Speed}\n個体値（{d.PerfectIVCount}V）\nHP {d.IndividualValues.HP} / 攻撃 {d.IndividualValues.Attack} / 防御 {d.IndividualValues.Defense}\n特攻 {d.IndividualValues.SpecialAttack} / 特防 {d.IndividualValues.SpecialDefense} / 素早さ {d.IndividualValues.Speed}\n親のID：{d.OriginalTrainerIdText}\nすごいとっくん：{d.HyperTrainingCount}能力";
         return $"ニックネーム：{p.Nickname}\nLv.{p.Level} {d?.Gender}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n性格：{d?.Nature ?? "—"}\n特性：{d?.Ability ?? "—"}\nもちもの：{d?.HeldItem ?? "—"}{stats}\n{training}\n\n技\n{string.Join("\n", p.Moves)}";
     }
     private static Button ActionButton(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 12 };

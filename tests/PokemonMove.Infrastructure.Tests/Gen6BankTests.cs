@@ -122,7 +122,7 @@ public sealed class Gen6BankTests : IDisposable
         var original=Assert.Single(await Bank().ListAsync());Assert.Equal("pk5",original.Entry.FormatKey);
         var gen6=new Document("xy",Gen6Fixtures.Create(GameVersion.Y));
         await Bank().MoveIntoBankAsync(gen6,new(false,30,29),Hash(gen6.Data));
-        var backup=await Bank().ExportAsync();Assert.Equal(4,JsonNode.Parse(backup)!["Version"]!.GetValue<int>());
+        var backup=await Bank().ExportAsync();Assert.Equal(5,JsonNode.Parse(backup)!["Version"]!.GetValue<int>());
         var other=new LocalBankStore(Path.Combine(root,"import"),new PokemonCodec(),new GameSaveEditor());
         Assert.Equal(2,await other.ImportAsync(backup));Assert.Equal(0,await other.ImportAsync(backup));
         Assert.Contains(await other.ListAsync(),p=>p.Entry.FormatKey=="pk6"&&p.Entry.TransferEligible);

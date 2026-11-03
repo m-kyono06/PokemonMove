@@ -5,6 +5,8 @@ public sealed record PokemonDetails(string Gender, string Nature, string Ability
     PokemonBattleStats Stats, int? CurrentHP, PokemonBattleStats EffortValues,
     PokemonBattleStats IndividualValues, ushort OriginalTrainerId)
 {
+    public string OriginalTrainerIdText { get; init; } = OriginalTrainerId.ToString("D5");
+    public int HyperTrainingCount { get; init; }
     public int PerfectIVCount => new[] { IndividualValues.HP, IndividualValues.Attack, IndividualValues.Defense,
         IndividualValues.SpecialAttack, IndividualValues.SpecialDefense, IndividualValues.Speed }.Count(value => value == 31);
     public int TotalEffortValues => EffortValues.HP + EffortValues.Attack + EffortValues.Defense

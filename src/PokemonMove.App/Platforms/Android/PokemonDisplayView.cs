@@ -62,13 +62,13 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         Portrait(c);
         Text(c, p.Nickname, 20, 280, 20, maxWidth: 180);
         Text(c, p.Type, 20, 303, 16, "AFC2CD", 180);
-        Text(c, p.Form == 0 ? "" : $"フォルム {p.Form}（画像は代表）", 20, 323, 13, "AFC2CD", 180);
+        Text(c, FormCaption(p), 20, 323, 13, "AFC2CD", 180);
         var d = p.Details;
         Text(c, $"Lv.{p.Level}  {d?.Gender}", 220, 98, 23);
         Text(c, $"性格：{d?.Nature ?? "—"} / 特性：{d?.Ability ?? "—"}", 220, 128, 16);
         Text(c, $"もちもの：{d?.HeldItem ?? "—"}", 220, 155, 16);
         Text(c, d is null ? "—V" : $"{d.PerfectIVCount}V（個体値31）", 425, 98, 18, "61DFC0");
-        Text(c, $"親のID：{(d is null ? "—" : d.OriginalTrainerId.ToString("D5"))}", 20, 345, 16);
+        Text(c, $"親のID：{(d is null ? "—" : d.OriginalTrainerIdText)}", 20, 345, 16);
         Text(c, $"努力値合計：{Value(d?.TotalEffortValues)}", 20, 367, 16, "AFC2CD");
         Text(c, "能力", 220, 180, 15, "AFC2CD");
         Text(c, "実数値", 360, 180, 15, "AFC2CD");
@@ -84,6 +84,9 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         for (var i = 0; i < Math.Min(4, p.Moves.Count); i++)
             Text(c, $"{i + 1}. {p.Moves[i]}", 220 + (i % 2) * 200, 343 + (i / 2) * 23, 16, "AFC2CD", 190);
     }
+    private static string FormCaption(PokemonSummary p) =>
+        (p.Form == 0 ? "" : $"フォルム {p.Form} ") +
+        (p.Details is { HyperTrainingCount: > 0 } details ? $"とっくん {details.HyperTrainingCount}能力" : "");
     private void StatRow(Canvas c, string label, float y, int? stat, int? effort, int? iv, int? currentHP = null)
     {
         Text(c, label, 220, y, 17);

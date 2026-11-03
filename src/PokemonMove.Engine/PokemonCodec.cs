@@ -11,6 +11,7 @@ public sealed class PokemonCodec : IPokemonCodec
         "pk4" => new Gen4PokemonCodec().Decode(data),
         "pk5" => new Gen5PokemonCodec().Decode(data),
         "pk6" => new Gen6PokemonCodec().Decode(data),
+        "pk7" => new Gen7PokemonCodec().Decode(data),
         _ => throw new InvalidDataException("対応していないポケモンのデータ形式です。"),
     };
 
@@ -23,7 +24,7 @@ public sealed class PokemonCodec : IPokemonCodec
         var types = new[] { At(strings.types, personal.Type1), At(strings.types, personal.Type2) }.Distinct();
         var data = Array.Empty<byte>();
         // Check before writing: PKHeX refreshes the entity checksum during serialization.
-        if (p.Species <= (p.Format switch { 6 => 721, 5 => 649, _ => 493 }) && p.ChecksumValid)
+        if (p.Species <= (p.Format switch { 7 => 802, 6 => 721, 5 => 649, _ => 493 }) && p.ChecksumValid)
         {
             data = new byte[p.SIZE_STORED];
             p.WriteEncryptedDataStored(data);
@@ -39,11 +40,15 @@ public sealed class PokemonCodec : IPokemonCodec
                 new(calculated.Stat_HPMax, calculated.Stat_ATK, calculated.Stat_DEF, calculated.Stat_SPA, calculated.Stat_SPD, calculated.Stat_SPE),
                 p.PartyStatsPresent ? p.Stat_HPCurrent : null,
                 new(p.EV_HP, p.EV_ATK, p.EV_DEF, p.EV_SPA, p.EV_SPD, p.EV_SPE),
-                new(p.IV_HP, p.IV_ATK, p.IV_DEF, p.IV_SPA, p.IV_SPD, p.IV_SPE), p.TID16);
+                new(p.IV_HP, p.IV_ATK, p.IV_DEF, p.IV_SPA, p.IV_SPD, p.IV_SPE), p.TID16)
+            {
+                OriginalTrainerIdText = p.DisplayTID.ToString(p.TrainerIDDisplayFormat == TrainerIDFormat.SixDigit ? "D6" : "D5"),
+                HyperTrainingCount = p is IHyperTrain h ? System.Numerics.BitOperations.PopCount((uint)(h.HyperTrainFlags & 0x3F)) : 0,
+            };
         }
         return new(slot, p.Species, At(strings.specieslist, p.Species), p.Nickname,
             p.CurrentLevel, string.Join(" / ", types),
             new[] { p.Move1, p.Move2, p.Move3, p.Move4 }.Where(m => m != 0)
-                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data, IsEgg = p.IsEgg, Form = p.Form, Details = details, FormatKey = p.Format switch { 6 => "pk6", 5 => "pk5", _ => "pk4" } };
+                .Select(m => At(strings.movelist, m)).ToArray(), p.IsShiny) { StoredData = data, IsEgg = p.IsEgg, Form = p.Form, Details = details, FormatKey = p.Format switch { 7 => "pk7", 6 => "pk6", 5 => "pk5", _ => "pk4" } };
     }
 }

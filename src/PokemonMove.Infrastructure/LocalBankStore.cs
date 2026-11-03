@@ -194,7 +194,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     {
         var root = Path.Combine(directory, "save-backups");
         Directory.CreateDirectory(root);
-        var file = Path.Combine(root, pending.Id.ToString("N") + (pending.Before.Length is 0x65600 or 0x76000 ? ".main" : pending.Before.Length == 0x80000 ? ".sav" : ".dsv"));
+        var file = Path.Combine(root, pending.Id.ToString("N") + (pending.Before.Length is 0x65600 or 0x76000 or 0x6BE00 ? ".main" : pending.Before.Length == 0x80000 ? ".sav" : ".dsv"));
         if (File.Exists(file))
         {
             if (!(await File.ReadAllBytesAsync(file)).AsSpan().SequenceEqual(pending.Before)) throw new InvalidDataException("セーブのバックアップが一致しません。");
@@ -258,7 +258,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         if (!File.Exists(path))
         {
             if (File.Exists(path + ".bak") || File.Exists(Path.Combine(directory, "moves.lock"))) throw new InvalidDataException("バンクが見つかりません。移動履歴を保護するため自動初期化しません。ファイルとバックアップを保持してください。");
-            return new(4, [], []);
+            return new(5, [], []);
         }
         return Parse(await ReadBoundedAsync(path));
     }
@@ -278,7 +278,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         Document? doc;
         try { doc = JsonSerializer.Deserialize<Document>(data); }
         catch (JsonException ex) { throw new InvalidDataException("バンクの形式が不正です。ファイルは変更していません。", ex); }
-        if (doc is null || doc.Version is not (1 or 2 or 3 or 4) || doc.Entries is null || doc.Entries.Count > MaximumEntries)
+        if (doc is null || doc.Version is not (1 or 2 or 3 or 4 or 5) || doc.Entries is null || doc.Entries.Count > MaximumEntries)
             throw new InvalidDataException("対応していないバンク形式です。");
         var ids = new HashSet<Guid>();
         for (var index = 0; index < doc.Entries.Count; index++)
@@ -290,10 +290,11 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             if (doc.Version < 3 && entry.FormatKey != "pk4")
                 throw new InvalidDataException("旧形式のバンクに第5世代の記録が含まれています。");
             if (doc.Version < 4 && entry.FormatKey == "pk6") throw new InvalidDataException("旧形式のバンクに第6世代の記録が含まれています。");
+            if (doc.Version < 5 && entry.FormatKey == "pk7") throw new InvalidDataException("旧形式に第7世代の記録が含まれています。");
             // Canonicalize so decrypted/imported representations cannot bypass deduplication.
             doc.Entries[index] = entry with { Data = codec.Decode(entry.Data, entry.FormatKey).StoredData, TransferEligible = doc.Version >= 2 && entry.TransferEligible };
         }
-        doc = doc with { Version = 4, Spent = doc.Spent ?? [] };
+        doc = doc with { Version = 5, Spent = doc.Spent ?? [] };
         if (doc.Spent.Any(id => id == Guid.Empty) || doc.Entries.Any(e => doc.Spent.Contains(e.Id)))
             throw new InvalidDataException("バンクの移動履歴が不正です。");
         if (doc.Pending is { } pending)
