@@ -154,14 +154,21 @@ public sealed class MainPage : ContentPage
                 BackgroundColor = Color.FromArgb(p.Species == 0 ? "30485B" : "45637B"), TextColor = Colors.White,
                 CornerRadius = 3, IsEnabled = p.Species != 0,
             };
-            button.Clicked += async (_, _) =>
+            bool SelectPokemon()
             {
-                if (loading || storing || !ReferenceEquals(snapshot, renderedSave)) return;
-                using var operation = operations.Begin();
+                if (loading || storing || !ReferenceEquals(snapshot, renderedSave)) return false;
                 RetroTheme.SelectSlot(slots, button);
                 selectedPokemon = p; selectedPosition = new(selectedLocation == 0, selectedLocation - 1, p.Slot);
                 selected.Text = $"選択：{p.Name} Lv.{p.Level}"; deposit.IsEnabled = p.CanStore;
                 inspection.SelectPokemon(p, $"{snapshot.Game} / {snapshot.TrainerName} / {(selectedLocation == 0 ? "手持ち" : snapshot.Boxes[selectedLocation - 1].Name)}");
+                return true;
+            }
+            // Focus changes preview the slot; only activation opens a single-screen dialog.
+            button.Focused += (_, _) => SelectPokemon();
+            button.Clicked += async (_, _) =>
+            {
+                if (!SelectPokemon()) return;
+                using var operation = operations.Begin();
                 if (!dual.IsActive) await DisplayAlertAsync(p.Name, BankPage.Detail(p), "閉じる");
             };
             slots.Add(button, p.Slot % 6, p.Slot / 6);

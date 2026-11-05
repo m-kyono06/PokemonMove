@@ -97,11 +97,21 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
     {
         // A compact EV gauge behind the label; exact values remain in their columns.
         paint.Color = AColor.ParseColor("#CBD6BE"); c.DrawRect(220, y + 3, 335, y + 6, paint);
-        paint.Color = AColor.ParseColor("#538267"); c.DrawRect(220, y + 3, 220 + 115 * Math.Clamp(effort ?? 0, 0, 255) / 255f, y + 6, paint);
+        paint.Color = AColor.ParseColor("#538267"); c.DrawRect(220, y + 3, 220 + 115 * Math.Clamp(effort ?? 0, 0, 252) / 252f, y + 6, paint);
         Text(c, label, 220, y, 17);
         Text(c, currentHP is { } hp ? $"{hp}/{Value(stat)}" : Value(stat), 350, y, 17, maxWidth: 100);
-        Text(c, Value(effort), 470, y, 17);
-        Text(c, Value(iv), 565, y, 17, iv == 31 ? "775613" : "253D37");
+        StatValue(c, effort, 455, y, effort >= 252, "MAX", 80);
+        StatValue(c, iv, 550, y, iv == 31, "V", 70);
+    }
+    private void StatValue(Canvas c, int? value, float x, float y, bool maximum, string suffix, float width)
+    {
+        if (maximum)
+        {
+            paint.Color = AColor.ParseColor("#245C42");
+            c.DrawRoundRect(new RectF(x, y - 17, x + width, y + 3), 3, 3, paint);
+        }
+        Text(c, Value(value) + (maximum ? " " + suffix : ""), x + 5, y, 16,
+            maximum ? "FFFFFF" : "253D37", width - 8, bold: maximum);
     }
     private void DrawSpecies(Canvas c, DexEntry p)
     {
@@ -123,9 +133,9 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         paint.FilterBitmap = false;
         c.DrawBitmap(sprite, null, new RectF(25, 88, 195, 258), paint);
     }
-    private void Text(Canvas c, string text, float x, float y, float size, string color = "253D37", float maxWidth = 600)
+    private void Text(Canvas c, string text, float x, float y, float size, string color = "253D37", float maxWidth = 600, bool bold = false)
     {
-        paint.Color = AColor.ParseColor("#" + color); paint.TextSize = size;
+        paint.Color = AColor.ParseColor("#" + color); paint.TextSize = size; paint.FakeBoldText = bold;
         var limit = Math.Min(maxWidth, 625 - x);
         while (text.Length > 1 && paint.MeasureText(text) > limit) text = text[..^1];
         c.DrawText(text, x, y, paint);

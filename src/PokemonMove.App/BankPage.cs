@@ -142,14 +142,21 @@ public sealed class BankPage : ContentPage
         {
             var item = page[i];
             var button = new Button { Text = item.Pokemon.Label, FontSize = 10, Padding = 1, HeightRequest = SlotHeight, CornerRadius = 3, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White };
-            button.Clicked += async (_, _) =>
+            bool SelectPokemon()
             {
-                if (busy) return;
-                using var operation = operations.Begin();
+                if (busy) return false;
                 RetroTheme.SelectSlot(slots, button);
                 selectedItem = item; withdraw.IsEnabled = item.Entry.TransferEligible && !pendingMove;
                 selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}（第{item.Pokemon.Generation}世代）" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
                 inspection.SelectPokemon(item.Pokemon, $"バンク / 保管元：{item.Entry.SourceGame}");
+                return true;
+            }
+            // Focus changes preview the slot; only activation opens a single-screen dialog.
+            button.Focused += (_, _) => SelectPokemon();
+            button.Clicked += async (_, _) =>
+            {
+                if (!SelectPokemon()) return;
+                using var operation = operations.Begin();
                 if (!dual.IsActive) await DisplayAlertAsync(item.Pokemon.Name, Detail(item.Pokemon), "閉じる");
             };
             slots.Add(button, i % 6, i / 6);
