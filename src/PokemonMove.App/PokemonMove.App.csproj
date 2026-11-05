@@ -3,7 +3,7 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <OutputType>Exe</OutputType><UseMaui>true</UseMaui><SingleProject>true</SingleProject>
     <ApplicationTitle>PokemonMove</ApplicationTitle><ApplicationId>io.github.mkyono06.pokemonmove</ApplicationId>
-    <ApplicationDisplayVersion>0.12.2</ApplicationDisplayVersion><ApplicationVersion>17</ApplicationVersion>
+    <ApplicationDisplayVersion>0.12.3</ApplicationDisplayVersion><ApplicationVersion>18</ApplicationVersion>
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>

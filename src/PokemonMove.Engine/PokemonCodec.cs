@@ -42,6 +42,7 @@ public sealed class PokemonCodec : IPokemonCodec
                 new(p.EV_HP, p.EV_ATK, p.EV_DEF, p.EV_SPA, p.EV_SPD, p.EV_SPE),
                 new(p.IV_HP, p.IV_ATK, p.IV_DEF, p.IV_SPA, p.IV_SPD, p.IV_SPE), p.TID16)
             {
+                NatureIndex = (int)p.Nature,
                 OriginalTrainerIdText = p.DisplayTID.ToString(p.TrainerIDDisplayFormat == TrainerIDFormat.SixDigit ? "D6" : "D5"),
                 HyperTrainingCount = p is IHyperTrain h ? System.Numerics.BitOperations.PopCount((uint)(h.HyperTrainFlags & 0x3F)) : 0,
             };

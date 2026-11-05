@@ -215,7 +215,7 @@ public sealed class BankPage : ContentPage
         var d = p.Details;
         var stats = d is null ? "" : $"\nHP {d.Stats.HP} / 攻撃 {d.Stats.Attack} / 防御 {d.Stats.Defense}\n特攻 {d.Stats.SpecialAttack} / 特防 {d.Stats.SpecialDefense} / 素早さ {d.Stats.Speed}";
         var training = d is null ? "" : $"\n努力値（合計 {d.TotalEffortValues}）\nHP {d.EffortValues.HP} / 攻撃 {d.EffortValues.Attack} / 防御 {d.EffortValues.Defense}\n特攻 {d.EffortValues.SpecialAttack} / 特防 {d.EffortValues.SpecialDefense} / 素早さ {d.EffortValues.Speed}\n個体値（{d.PerfectIVCount}V）\nHP {d.IndividualValues.HP} / 攻撃 {d.IndividualValues.Attack} / 防御 {d.IndividualValues.Defense}\n特攻 {d.IndividualValues.SpecialAttack} / 特防 {d.IndividualValues.SpecialDefense} / 素早さ {d.IndividualValues.Speed}\n親のID：{d.OriginalTrainerIdText}\nすごいとっくん：{d.HyperTrainingCount}能力";
-        return $"ニックネーム：{p.Nickname}\nLv.{p.Level} {d?.Gender}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n性格：{d?.Nature ?? "—"}\n特性：{d?.Ability ?? "—"}\nもちもの：{d?.HeldItem ?? "—"}{stats}\n{training}\n\n技\n{string.Join("\n", p.Moves)}";
+        return $"ニックネーム：{p.Nickname}\nLv.{p.Level} {d?.Gender}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n性格：{d?.Nature ?? "—"}（{d?.NatureModifiersText ?? "—"}）\n特性：{d?.Ability ?? "—"}\nもちもの：{d?.HeldItem ?? "—"}{stats}\n{training}\n\n技\n{string.Join("\n", p.Moves)}";
     }
     private static Button ActionButton(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
 }

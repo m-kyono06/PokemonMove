@@ -71,8 +71,9 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         Text(c, FormCaption(p), 20, 323, 13, "52665B", 180);
         var d = p.Details;
         Text(c, $"Lv.{p.Level}  {d?.Gender}", 220, 98, 23);
-        Text(c, $"性格：{d?.Nature ?? "—"} / 特性：{d?.Ability ?? "—"}", 220, 128, 16);
-        Text(c, $"もちもの：{d?.HeldItem ?? "—"}", 220, 155, 16);
+        Text(c, $"性格：{d?.Nature ?? "—"}（{d?.NatureModifiersText ?? "—"}）", 220, 122, 16);
+        Text(c, $"特性：{d?.Ability ?? "—"}", 220, 144, 16);
+        Text(c, $"もちもの：{d?.HeldItem ?? "—"}", 220, 164, 15);
         Text(c, d is null ? "—V" : $"{d.PerfectIVCount}V（個体値31）", 425, 98, 18, "775613");
         Text(c, $"親のID：{(d is null ? "—" : d.OriginalTrainerIdText)}", 20, 345, 16);
         Text(c, $"努力値合計：{Value(d?.TotalEffortValues)}", 20, 367, 16, "52665B");
@@ -82,11 +83,11 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         Text(c, "個体値", 550, 180, 15, "52665B");
         var s = d?.Stats; var e = d?.EffortValues; var v = d?.IndividualValues;
         StatRow(c, "HP", 202, s?.HP, e?.HP, v?.HP, d?.CurrentHP);
-        StatRow(c, "攻撃", 225, s?.Attack, e?.Attack, v?.Attack);
-        StatRow(c, "防御", 248, s?.Defense, e?.Defense, v?.Defense);
-        StatRow(c, "特攻", 271, s?.SpecialAttack, e?.SpecialAttack, v?.SpecialAttack);
-        StatRow(c, "特防", 294, s?.SpecialDefense, e?.SpecialDefense, v?.SpecialDefense);
-        StatRow(c, "素早さ", 317, s?.Speed, e?.Speed, v?.Speed);
+        StatRow(c, "攻撃" + d?.NatureArrow("攻撃"), 225, s?.Attack, e?.Attack, v?.Attack);
+        StatRow(c, "防御" + d?.NatureArrow("防御"), 248, s?.Defense, e?.Defense, v?.Defense);
+        StatRow(c, "特攻" + d?.NatureArrow("特攻"), 271, s?.SpecialAttack, e?.SpecialAttack, v?.SpecialAttack);
+        StatRow(c, "特防" + d?.NatureArrow("特防"), 294, s?.SpecialDefense, e?.SpecialDefense, v?.SpecialDefense);
+        StatRow(c, "素早さ" + d?.NatureArrow("素早さ"), 317, s?.Speed, e?.Speed, v?.Speed);
         for (var i = 0; i < Math.Min(4, p.Moves.Count); i++)
             Text(c, $"{i + 1}. {p.Moves[i]}", 220 + (i % 2) * 200, 343 + (i / 2) * 23, 16, "52665B", 190);
     }
@@ -98,7 +99,8 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
         // A compact EV gauge behind the label; exact values remain in their columns.
         paint.Color = AColor.ParseColor("#CBD6BE"); c.DrawRect(220, y + 3, 335, y + 6, paint);
         paint.Color = AColor.ParseColor("#538267"); c.DrawRect(220, y + 3, 220 + 115 * Math.Clamp(effort ?? 0, 0, 252) / 252f, y + 6, paint);
-        Text(c, label, 220, y, 17);
+        var raised = label.EndsWith("↑"); var lowered = label.EndsWith("↓");
+        Text(c, label, 220, y, 17, raised ? "A33225" : lowered ? "2459A3" : "253D37", bold: raised || lowered);
         Text(c, currentHP is { } hp ? $"{hp}/{Value(stat)}" : Value(stat), 350, y, 17, maxWidth: 100);
         StatValue(c, effort, 455, y, effort >= 252, "MAX", 80);
         StatValue(c, iv, 550, y, iv == 31, "V", 70);

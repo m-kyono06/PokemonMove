@@ -7,6 +7,15 @@ public sealed record PokemonDetails(string Gender, string Nature, string Ability
 {
     public string OriginalTrainerIdText { get; init; } = OriginalTrainerId.ToString("D5");
     public int HyperTrainingCount { get; init; }
+    public int? NatureIndex { get; init; }
+    private static readonly string[] NatureStats = ["攻撃", "防御", "素早さ", "特攻", "特防"];
+    public string? NatureRaisedStat => NatureIndex is >= 0 and < 25 && NatureIndex / 5 != NatureIndex % 5
+        ? NatureStats[NatureIndex.Value / 5] : null;
+    public string? NatureLoweredStat => NatureIndex is >= 0 and < 25 && NatureIndex / 5 != NatureIndex % 5
+        ? NatureStats[NatureIndex.Value % 5] : null;
+    public string NatureModifiersText => NatureIndex is not (>= 0 and < 25) ? "—"
+        : NatureRaisedStat is { } up ? $"{up}↑ {NatureLoweredStat}↓" : "補正なし";
+    public string NatureArrow(string stat) => stat == NatureRaisedStat ? "↑" : stat == NatureLoweredStat ? "↓" : "";
     public int PerfectIVCount => new[] { IndividualValues.HP, IndividualValues.Attack, IndividualValues.Defense,
         IndividualValues.SpecialAttack, IndividualValues.SpecialDefense, IndividualValues.Speed }.Count(value => value == 31);
     public int TotalEffortValues => EffortValues.HP + EffortValues.Attack + EffortValues.Defense
