@@ -15,11 +15,11 @@ public sealed class CollectionPage : ContentPage
     private bool active;
     private readonly Label summary = new() { TextColor = Colors.White, FontSize = 16 };
     private readonly Label scope = new() { TextColor = Colors.LightGray, FontSize = 12 };
-    private readonly ProgressBar progress = new() { ProgressColor = Color.FromArgb("61DFC0") };
+    private readonly ProgressBar progress = new() { ProgressColor = Color.FromArgb("F2CF72") };
     private readonly SearchBar search = new() { Placeholder = "名前・全国図鑑番号で検索", TextColor = Colors.White, PlaceholderColor = Colors.LightGray };
     private readonly Picker variant = new() { Title = "色", TextColor = Colors.White, ItemsSource = new[] { "通常・色違い", "通常色", "色違い" }, SelectedIndex = 0 };
     private readonly Picker ownership = new() { Title = "所持状況", TextColor = Colors.White, ItemsSource = new[] { "すべて", "所持", "未所持" }, SelectedIndex = 0 };
-    private readonly Button refresh = new() { Text = "更新", WidthRequest = 72, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White };
+    private readonly Button refresh = new() { Text = "更新", WidthRequest = 72, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White };
     private readonly Label empty = new() { TextColor = Colors.LightGray, Margin = 12 };
     private readonly CollectionView entries = new() { SelectionMode = SelectionMode.Single };
 
@@ -27,7 +27,7 @@ public sealed class CollectionPage : ContentPage
     {
         this.bank = bank; this.dex = dex; this.library = library; this.inspection = inspection; this.dual = dual; this.operations = operations;
         Title = "収集図鑑";
-        BackgroundColor = Color.FromArgb("152B36");
+        BackgroundColor = Color.FromArgb("253B50");
         entries.ItemTemplate = new DataTemplate(() =>
         {
             var title = new Label { FontSize = 17, TextColor = Colors.White, FontAttributes = FontAttributes.Bold };
@@ -37,7 +37,7 @@ public sealed class CollectionPage : ContentPage
             state.SetBinding(Label.TextColorProperty, nameof(Row.Color));
             var sources = new Label { FontSize = 12, TextColor = Colors.LightGray };
             sources.SetBinding(Label.TextProperty, nameof(Row.Sources));
-            return new VerticalStackLayout { Padding = new Thickness(8, 10), Spacing = 3, Children = { title, state, sources } };
+            return RetroTheme.Panel(new VerticalStackLayout { Spacing = 3, Children = { title, state, sources } });
         });
         entries.EmptyView = empty;
         entries.SelectionChanged += async (_, e) =>
@@ -58,7 +58,7 @@ public sealed class CollectionPage : ContentPage
         var filters = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 12 };
         filters.Add(variant, 0); filters.Add(ownership, 1);
         var heading = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
-        heading.Add(new Label { Text = "全国図鑑 No.001–807", FontSize = 20, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, VerticalOptions = LayoutOptions.Center }, 0);
+        heading.Add(RetroTheme.Heading("収集図鑑", "NATIONAL No.001–807"), 0);
         heading.Add(refresh, 1);
         var header = new VerticalStackLayout { Padding = 12, Spacing = 6, Children =
         {
@@ -133,7 +133,7 @@ public sealed class CollectionPage : ContentPage
     {
         public string Title => $"No.{Entry.Species:000}  {Entry.Name}";
         public string State => Entry.Count(Variant) > 0 ? "● 所持" + (Variant == DexVariant.All && Entry.Count(DexVariant.Shiny) > 0 ? " / ★ 色違いあり" : "") : "○ 未所持";
-        public Color Color => Microsoft.Maui.Graphics.Color.FromArgb(Entry.Count(Variant) > 0 ? "61DFC0" : "AFC2CD");
+        public Color Color => Microsoft.Maui.Graphics.Color.FromArgb(Entry.Count(Variant) > 0 ? "F2CF72" : "CCD7DC");
         public string Sources => $"手持ち {Entry.Party(Variant)}匹 / ボックス {Entry.Boxes(Variant)}匹 / バンク {Entry.Bank(Variant)}件";
     }
 }

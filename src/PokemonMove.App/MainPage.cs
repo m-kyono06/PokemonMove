@@ -21,13 +21,13 @@ public sealed class MainPage : ContentPage
     private PokemonSummary? selectedPokemon;
     private PokemonLocation? selectedPosition;
     private readonly Label selected = new() { Text = "ポケモンを選択してください。", FontSize = 12, TextColor = Colors.White };
-    private readonly Button deposit = new() { Text = "選択したポケモンをバンクへ移動", IsEnabled = false, FontSize = 13, BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 12 };
+    private readonly Button deposit = new() { Text = "選択したポケモンをバンクへ移動", IsEnabled = false, FontSize = 13, BackgroundColor = Color.FromArgb("F2CF72"), TextColor = Color.FromArgb("253B50"), CornerRadius = 4 };
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
-    private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っている対応作品のセーブ（DS通常セーブ／XY・ORAS・サンムーン・USUMのmain）を選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("AFC2CD") };
-    private readonly Picker location = new() { Title = "手持ち / ボックス", TextColor = Colors.White, BackgroundColor = Color.FromArgb("233E4B") };
+    private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っている対応作品のセーブ（DS通常セーブ／XY・ORAS・サンムーン・USUMのmain）を選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("CCD7DC") };
+    private readonly Picker location = new() { Title = "手持ち / ボックス", TextColor = Colors.White, BackgroundColor = Color.FromArgb("344E65") };
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
-    private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("61DFC0"), TextColor = Color.FromArgb("152B36"), CornerRadius = 14 };
+    private readonly Button open = new() { Text = "セーブファイルを開く", BackgroundColor = Color.FromArgb("F2CF72"), TextColor = Color.FromArgb("253B50"), CornerRadius = 4 };
 
     public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex, IRegisteredSaves registry, ISaveLibraryReader library, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
     {
@@ -41,15 +41,15 @@ public sealed class MainPage : ContentPage
         this.dual = dual;
         this.operations = operations;
         Title = "PokemonMove";
-        BackgroundColor = Color.FromArgb("152B36");
+        BackgroundColor = Color.FromArgb("253B50");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         for (var i = 0; i < 5; i++) slots.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         open.Clicked += OpenSave;
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
-        var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
+        var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
         bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader, registry, inspection, dual, operations));
-        var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 14 };
+        var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
         dexButton.Clicked += async (_, _) =>
         {
             if (loading || storing) return;
@@ -72,8 +72,8 @@ public sealed class MainPage : ContentPage
         {
             Content = new VerticalStackLayout { Padding = 12, Spacing = 8, Children =
             {
-                actions, status, location, slots, selected, deposit,
-                new Label { Text = "操作前にエミュレータを終了してください。選択した実ファイルを書き換えます。2画面設定・登録一覧は右上メニューから開けます。", FontSize = 11, TextColor = Color.FromArgb("AFC2CD") }
+                RetroTheme.Heading("POKÉMON MOVE", "BOX TERMINAL"), actions, RetroTheme.Panel(status), location, RetroTheme.Panel(slots), selected, deposit,
+                new Label { Text = "操作前にエミュレータを終了してください。選択した実ファイルを書き換えます。2画面設定・登録一覧は右上メニューから開けます。", FontSize = 11, TextColor = Color.FromArgb("CCD7DC") }
             }}
         };
     }
@@ -151,13 +151,14 @@ public sealed class MainPage : ContentPage
             var button = new Button
             {
                 Text = p.Label, FontSize = 10, Padding = new Thickness(1), HeightRequest = SlotHeight,
-                BackgroundColor = Color.FromArgb(p.Species == 0 ? "1C333E" : "294D59"), TextColor = Colors.White,
-                CornerRadius = 8, IsEnabled = p.Species != 0,
+                BackgroundColor = Color.FromArgb(p.Species == 0 ? "30485B" : "45637B"), TextColor = Colors.White,
+                CornerRadius = 3, IsEnabled = p.Species != 0,
             };
             button.Clicked += async (_, _) =>
             {
                 if (loading || storing || !ReferenceEquals(snapshot, renderedSave)) return;
                 using var operation = operations.Begin();
+                RetroTheme.SelectSlot(slots, button);
                 selectedPokemon = p; selectedPosition = new(selectedLocation == 0, selectedLocation - 1, p.Slot);
                 selected.Text = $"選択：{p.Name} Lv.{p.Level}"; deposit.IsEnabled = p.CanStore;
                 inspection.SelectPokemon(p, $"{snapshot.Game} / {snapshot.TrainerName} / {(selectedLocation == 0 ? "手持ち" : snapshot.Boxes[selectedLocation - 1].Name)}");

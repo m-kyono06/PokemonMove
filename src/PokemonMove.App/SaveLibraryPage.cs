@@ -19,7 +19,7 @@ public sealed class SaveLibraryPage : ContentPage
     public SaveLibraryPage(IRegisteredSaves registry, ISaveDocuments documents, ISaveReader reader, UserOperations operations)
     {
         this.registry = registry; this.documents = documents; this.reader = reader; this.operations = operations;
-        Title = "登録セーブの管理"; BackgroundColor = Color.FromArgb("152B36");
+        Title = "登録セーブの管理"; BackgroundColor = Color.FromArgb("253B50");
         saves.ItemTemplate = new DataTemplate(() =>
         {
             var title = new Label { FontSize = 17, TextColor = Colors.White };
@@ -110,7 +110,7 @@ public sealed class SaveLibraryPage : ContentPage
         { status.Text = "登録一覧を処理できませんでした。"; await DisplayAlertAsync("登録できませんでした", ex is InvalidDataException ? ex.Message : "ファイルの保存場所と権限を確認してください。", "閉じる"); }
         finally { busy = false; add.IsEnabled = export.IsEnabled = import.IsEnabled = saves.IsEnabled = true; }
     }
-    private static Button Button(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White };
+    private static Button Button(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White };
     public sealed record Row(RegisteredSave Save)
     {
         public string Title => $"{Save.Game} / {Save.Trainer}";

@@ -40,7 +40,7 @@ public sealed class BankPage : ContentPage
         this.dual = dual;
         this.operations = operations;
         Title = "ローカルバンク";
-        BackgroundColor = Color.FromArgb("152B36");
+        BackgroundColor = Color.FromArgb("253B50");
         for (var i = 0; i < 6; i++) slots.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         for (var i = 0; i < 5; i++) slots.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         search.TextChanged += (_, _) => Filter();
@@ -99,7 +99,7 @@ public sealed class BankPage : ContentPage
             Padding = 12, Spacing = 8,
             Children =
             {
-                status, search, box, slots, selected, withdraw,
+                RetroTheme.Heading("ローカルバンク", "POKÉMON STORAGE"), status, search, box, RetroTheme.Panel(slots), selected, withdraw,
                 new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5、第5→第6、第6→第7世代は一方向の変換です。前の世代へは戻せません。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
@@ -141,11 +141,12 @@ public sealed class BankPage : ContentPage
         for (var i = 0; i < page.Length; i++)
         {
             var item = page[i];
-            var button = new Button { Text = item.Pokemon.Label, FontSize = 10, Padding = 1, HeightRequest = SlotHeight, CornerRadius = 8, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White };
+            var button = new Button { Text = item.Pokemon.Label, FontSize = 10, Padding = 1, HeightRequest = SlotHeight, CornerRadius = 3, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White };
             button.Clicked += async (_, _) =>
             {
                 if (busy) return;
                 using var operation = operations.Begin();
+                RetroTheme.SelectSlot(slots, button);
                 selectedItem = item; withdraw.IsEnabled = item.Entry.TransferEligible && !pendingMove;
                 selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}（第{item.Pokemon.Generation}世代）" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
                 inspection.SelectPokemon(item.Pokemon, $"バンク / 保管元：{item.Entry.SourceGame}");
@@ -209,5 +210,5 @@ public sealed class BankPage : ContentPage
         var training = d is null ? "" : $"\n努力値（合計 {d.TotalEffortValues}）\nHP {d.EffortValues.HP} / 攻撃 {d.EffortValues.Attack} / 防御 {d.EffortValues.Defense}\n特攻 {d.EffortValues.SpecialAttack} / 特防 {d.EffortValues.SpecialDefense} / 素早さ {d.EffortValues.Speed}\n個体値（{d.PerfectIVCount}V）\nHP {d.IndividualValues.HP} / 攻撃 {d.IndividualValues.Attack} / 防御 {d.IndividualValues.Defense}\n特攻 {d.IndividualValues.SpecialAttack} / 特防 {d.IndividualValues.SpecialDefense} / 素早さ {d.IndividualValues.Speed}\n親のID：{d.OriginalTrainerIdText}\nすごいとっくん：{d.HyperTrainingCount}能力";
         return $"ニックネーム：{p.Nickname}\nLv.{p.Level} {d?.Gender}\nタイプ：{p.Type}\n色違い：{(p.IsShiny ? "はい" : "いいえ")}\n性格：{d?.Nature ?? "—"}\n特性：{d?.Ability ?? "—"}\nもちもの：{d?.HeldItem ?? "—"}{stats}\n{training}\n\n技\n{string.Join("\n", p.Moves)}";
     }
-    private static Button ActionButton(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("294D59"), TextColor = Colors.White, CornerRadius = 12 };
+    private static Button ActionButton(string text) => new() { Text = text, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
 }

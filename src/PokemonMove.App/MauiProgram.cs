@@ -30,5 +30,10 @@ public static class MauiProgram
 
 public sealed class App(IServiceProvider services) : Application
 {
-    protected override Window CreateWindow(IActivationState? activationState) => new(new NavigationPage(services.GetRequiredService<MainPage>()) { BarBackgroundColor = Color.FromArgb("152B36"), BarTextColor = Colors.White });
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        Resources = RetroTheme.Resources();
+        UserAppTheme = AppTheme.Light;
+        return new(new NavigationPage(services.GetRequiredService<MainPage>()) { BarBackgroundColor = Color.FromArgb("253B50"), BarTextColor = Colors.White });
+    }
 }

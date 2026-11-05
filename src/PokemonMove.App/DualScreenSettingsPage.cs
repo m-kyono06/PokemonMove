@@ -12,7 +12,7 @@ public sealed class DualScreenSettingsPage : ContentPage
     private readonly Button start = Button("2画面モードを開始");
     public DualScreenSettingsPage(IDualScreenManager manager)
     {
-        this.manager = manager; Title = "2画面設定"; BackgroundColor = Color.FromArgb("152B36");
+        this.manager = manager; Title = "2画面設定"; BackgroundColor = Color.FromArgb("253B50");
         var refresh = Button("画面を再確認"); refresh.Clicked += (_, _) => Refresh();
         var swap = Button("上下を入れ替える"); swap.Clicked += (_, _) =>
         { var previous = controls.SelectedIndex; controls.SelectedIndex = inspector.SelectedIndex; inspector.SelectedIndex = previous; };
@@ -53,5 +53,5 @@ public sealed class DualScreenSettingsPage : ContentPage
         start.IsEnabled = route is not null;
         status.Text = $"検出した画面：{screens.Count}\n{manager.Status}";
     }
-    private static Button Button(string text) => new() { Text = text, TextColor = Colors.White, BackgroundColor = Color.FromArgb("294D59") };
+    private static Button Button(string text) => new() { Text = text, TextColor = Colors.White, BackgroundColor = Color.FromArgb("45637B") };
 }
