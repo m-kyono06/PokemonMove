@@ -5,6 +5,7 @@ namespace PokemonMove.App;
 /// <summary>Shared handheld-console palette and compact, framed controls.</summary>
 internal static class RetroTheme
 {
+    public const string FontFamily = "RetroJapanese";
     private static readonly Color Frame = Color.FromArgb("8298A5");
     private static readonly Color Gold = Color.FromArgb("F2CF72");
     private static readonly Color Surface = Color.FromArgb("344E65");
@@ -17,7 +18,20 @@ internal static class RetroTheme
         buttons.Setters.Add(new Setter { Property = Button.BorderWidthProperty, Value = 1d });
         buttons.Setters.Add(new Setter { Property = Button.BorderColorProperty, Value = Frame });
         buttons.Setters.Add(new Setter { Property = Button.FontAttributesProperty, Value = FontAttributes.Bold });
+        buttons.Setters.Add(new Setter { Property = Button.FontFamilyProperty, Value = FontFamily });
         resources.Add(buttons);
+        foreach (var (type, fontProperty) in new (Type, BindableProperty)[]
+        {
+            (typeof(Label), Label.FontFamilyProperty),
+            (typeof(Picker), Picker.FontFamilyProperty),
+            (typeof(SearchBar), SearchBar.FontFamilyProperty),
+            (typeof(Entry), Entry.FontFamilyProperty),
+        })
+        {
+            var style = new Style(type);
+            style.Setters.Add(new Setter { Property = fontProperty, Value = FontFamily });
+            resources.Add(style);
+        }
         return resources;
     }
 

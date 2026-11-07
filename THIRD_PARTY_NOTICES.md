@@ -37,3 +37,9 @@ These dependencies retain their respective licenses and copyright notices.
   from upstream `Tests/PKHeX.Core.Tests/Saves/MemeCrypto/MemeCryptoTests.cs`.
   Corresponding adapted source is included in the PokemonMove source archive;
   unmodified upstream source is attached separately as described above.
+
+## DotGothic16
+
+DotGothic16 Regular (unmodified), Copyright 2020 The DotGothic16 Project Authors.
+Source: https://github.com/google/fonts/tree/main/ofl/dotgothic16
+License: SIL Open Font License 1.1. Full text: src/PokemonMove.App/Resources/Fonts/OFL.txt (also bundled as assets/licenses/DotGothic16-OFL.txt).

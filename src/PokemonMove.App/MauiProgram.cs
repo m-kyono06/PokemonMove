@@ -8,7 +8,9 @@ namespace PokemonMove.App;
 public static class MauiProgram
 {
     public static MauiApp CreateMauiApp() => MauiApp.CreateBuilder()
-        .UseMauiApp<App>().ConfigureServices().Build();
+        .UseMauiApp<App>()
+        .ConfigureFonts(fonts => fonts.AddFont("DotGothic16-Regular.ttf", RetroTheme.FontFamily))
+        .ConfigureServices().Build();
 
     private static MauiAppBuilder ConfigureServices(this MauiAppBuilder builder)
     {

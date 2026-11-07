@@ -14,6 +14,7 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
 {
     private InspectionSnapshot state = new(null, null, DexVariant.All, "下画面でポケモンを選択してください。");
     private readonly Paint paint = new(PaintFlags.AntiAlias);
+    private readonly Typeface retroTypeface = Typeface.CreateFromAsset(context.Assets, "DotGothic16-Regular.ttf")!;
     private Bitmap? sprite;
     private string spriteKey = "";
     public void Update(InspectionSnapshot next)
@@ -137,7 +138,7 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
     }
     private void Text(Canvas c, string text, float x, float y, float size, string color = "253D37", float maxWidth = 600, bool bold = false)
     {
-        paint.Color = AColor.ParseColor("#" + color); paint.TextSize = size; paint.FakeBoldText = bold;
+        paint.Color = AColor.ParseColor("#" + color); paint.TextSize = size; paint.FakeBoldText = bold; paint.SetTypeface(retroTypeface);
         var limit = Math.Min(maxWidth, 625 - x);
         while (text.Length > 1 && paint.MeasureText(text) > limit) text = text[..^1];
         c.DrawText(text, x, y, paint);
@@ -145,7 +146,7 @@ internal sealed class PokemonDisplayView(Context context) : View(context)
     private static string Value(int? value) => value?.ToString() ?? "—";
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { sprite?.Dispose(); sprite = null; paint.Dispose(); }
+        if (disposing) { sprite?.Dispose(); sprite = null; paint.Dispose(); retroTypeface.Dispose(); }
         base.Dispose(disposing);
     }
 }
