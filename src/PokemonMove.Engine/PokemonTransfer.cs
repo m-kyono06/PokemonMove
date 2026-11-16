@@ -3,21 +3,21 @@ using PokemonMove.Domain;
 
 namespace PokemonMove.Engine;
 
-/// <summary>Deterministic one-way PK4→PK5 and PK5→PK6 conversions. Never downgrade.</summary>
+/// <summary>Deterministic forward transfers and explicitly non-official backward reconstruction.</summary>
 public sealed class PokemonTransfer
 {
     public PokemonTransferPlan Prepare(PokemonSummary pokemon, string targetFormat, DateOnly? transferDate = null, TransferTrainerProfile? trainer = null)
     {
         var source = new PokemonCodec().Decode(pokemon.StoredData, pokemon.FormatKey);
+        var targetGeneration = BackwardPokemonTransfer.Generation(targetFormat);
+        if (targetGeneration == 0) throw new InvalidDataException("この移動先の作品には対応していません。");
+        if (source.Generation > targetGeneration)
+            return BackwardPokemonTransfer.Prepare(source, targetFormat, transferDate);
         if (targetFormat is "sm" or "usum") return PrepareGen7(source, trainer);
-        if (source.FormatKey == "pk7") throw new InvalidDataException("第7世代の個体は以前の作品へ戻せません。個体はバンクに残っています。");
         if (targetFormat is "xy" or "oras") return PrepareGen6(source, trainer);
-        if (source.FormatKey == "pk6") throw new InvalidDataException("第6世代の個体をDS作品へ戻すことはできません。個体はバンクに残っています。");
         var target5 = targetFormat is "bw" or "b2w2";
         if (!target5 && targetFormat is not ("dp" or "pt" or "hgss"))
             throw new InvalidDataException("この移動先の作品には対応していません。");
-        if (source.FormatKey == "pk5" && !target5)
-            throw new InvalidDataException("第5世代の個体を第4世代へ戻すことはできません。個体はバンクに残っています。");
         if (source.FormatKey == "pk5" || !target5) return new(source, false, []);
         if (transferDate is not { Year: >= 2000 and <= 2099 } date)
             throw new InvalidDataException("世代移動の日付を確認できません。移動先を選び直してください。");
@@ -39,7 +39,7 @@ public sealed class PokemonTransfer
         var converted = new Gen5PokemonCodec().Decode(data);
         var notices = new List<string>
         {
-            "第5世代へ変換します。第4世代へは戻せません。",
+            "第5世代へ変換します。第4世代へ戻す場合は、元の記録へ復元するのではなく非公式の逆方向変換になります。",
             $"出会った場所・レベル・日付を移動情報に変更します（日付：{date:yyyy/MM/dd}）。",
             "なつき度は70、技のPPは回復した状態になります。名前の文字コードも第5世代へ変換します。",
         };
@@ -70,7 +70,7 @@ public sealed class PokemonTransfer
         var data = new byte[pk6.SIZE_STORED];pk6.WriteEncryptedDataStored(data);
         var notices = new List<string>
         {
-            "第6世代へ変換します。DS作品へは戻せません。",
+            "第6世代へ変換します。DS作品へ戻す場合は、記録の変更・消失を伴う非公式の逆方向変換になります。",
             "名前・リボン・なつき度・タイプ・能力値・特性・技のPPを第6世代の仕様へ合わせ、移動先のトレーナー情報と思い出を設定します。",
             "出会った場所と日付は第5世代の情報を保持します。",
         };
@@ -100,7 +100,7 @@ public sealed class PokemonTransfer
         var bytes = new byte[pk7.SIZE_STORED];pk7.WriteEncryptedDataStored(bytes);
         return new(new Gen7PokemonCodec().Decode(bytes), true,
         [
-            "第7世代へ変換します。以前の作品へは戻せません。",
+            "第7世代へ変換します。以前の世代へ戻す場合は、記録の変更・消失を伴う非公式の逆方向変換になります。",
             "親ID・個体値・努力値・性格・色違い状態・出会った情報を保持します。",
             "マーキング・特性・なつき度・思い出・リフレ等の情報と技のPPを第7世代の仕様へ合わせ、移動先のトレーナー情報を設定します。能力値は第7世代の種族値・特性で計算します。",
         ]);

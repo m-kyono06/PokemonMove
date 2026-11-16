@@ -62,7 +62,7 @@ public sealed class Gen7BankTests : IDisposable
 
     [Theory]
     [MemberData(nameof(ForwardPairs))]
-    public async Task Gen6MovesToAnyGen7GameAndCannotReturn(GameVersion a,GameVersion b)
+    public async Task Gen6MovesToAnyGen7GameButReverseRequiresExplicitDate(GameVersion a,GameVersion b)
     {
         var source=new Document("old",Gen6Fixtures.Create(a));var target=new Document("sm",Gen7Fixtures.Create(b));
         await Bank().MoveIntoBankAsync(source,new(false,30,29),Hash(source.Data));

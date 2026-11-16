@@ -37,8 +37,8 @@ public sealed class Gen4SaveEditor : ISaveEditor
         ValidateLocation(save, location);
         if (save.GetBoxSlotAtIndex(location.Box, location.Slot).Species != 0)
             throw new InvalidDataException("引き出し先の枠は空いていません。");
-        if (formatKey != "pk4") throw new InvalidDataException("新しい世代の個体を第4世代へ戻すことはできません。");
-        var summary = new Gen4PokemonCodec().Decode(pokemon, formatKey);
+        var original = new PokemonCodec().Decode(pokemon, formatKey);
+        var summary = new PokemonTransfer().Prepare(original, snapshot.FormatKey, transferDate).Pokemon;
         // Do not insert a second byte-identical instance into the destination save.
         if (snapshot.Party.Concat(snapshot.Boxes.SelectMany(b => b.Slots))
             .Any(p => p.CanStore && p.StoredData.AsSpan().SequenceEqual(summary.StoredData)))
@@ -48,7 +48,7 @@ public sealed class Gen4SaveEditor : ISaveEditor
         ValidateCompatibility(save, pk);
         save.SetBoxSlotAtIndex(pk, location.Box, location.Slot, EntityImportSettings.None);
         if (save is SAV4HGSS hgss) hgss.FlagsBoxContentChanged |= 1 << location.Box;
-        return new(Finish(source, save), summary, snapshot.Game, snapshot.TrainerName);
+        return new(Finish(source, save), original, snapshot.Game, snapshot.TrainerName);
     }
 
     private static (SAV4, SaveSnapshot) Open(byte[] source)

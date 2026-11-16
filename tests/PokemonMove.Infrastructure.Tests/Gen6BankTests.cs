@@ -63,7 +63,7 @@ public sealed class Gen6BankTests : IDisposable
 
     [Theory]
     [MemberData(nameof(ForwardPairs))]
-    public async Task AllBWGamesCanMoveToAllGen6GamesButNeverReturnToDS(GameVersion a,GameVersion b)
+    public async Task AllBWGamesCanMoveToAllGen6GamesButReverseRequiresExplicitDate(GameVersion a,GameVersion b)
     {
         var source=new Document("bw",Gen5Fixtures.Create(a));var target=new Document("xy",Gen6Fixtures.Create(b));
         await Bank().MoveIntoBankAsync(source,new(false,23,29),Hash(source.Data));

@@ -100,7 +100,7 @@ public sealed class BankPage : ContentPage
             Children =
             {
                 RetroTheme.Heading("ローカルバンク", "POKÉMON STORAGE"), status, search, box, RetroTheme.Panel(slots), selected, withdraw,
-                new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5、第5→第6、第6→第7世代は一方向の変換です。前の世代へは戻せません。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
+                new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5、第5→第6、第6→第7世代の変換に対応します。第5〜第7世代から以前の世代へは、対応する個体のみ非公式の逆方向変換ができます。出身情報の変更・記録の消失は実行前に確認してください。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
         }};
@@ -200,8 +200,9 @@ public sealed class BankPage : ContentPage
         if (index < 0) return;
         var slot = save.Boxes[index].Slots.FirstOrDefault(p => p.Species == 0);
         if (slot is null) throw new InvalidDataException("そのボックスに空き枠がありません。");
+        var isBackward = plan.Pokemon.Generation < item.Pokemon.Generation;
         var notices = plan.Notices.Count == 0 ? "" : "\n\n" + string.Join("\n", plan.Notices);
-        if (!await DisplayAlertAsync(plan.IsGenerationTransfer ? "世代をまたぐ移動を確定" : "移動を確定", $"{save.Game} / {save.TrainerName}\n{save.Boxes[index].Name} の {slot.Slot + 1}番へ移動します。選択したセーブを書き換え、成功後にバンクから取り除きます。{notices}", plan.IsGenerationTransfer ? $"第{plan.Pokemon.Generation}世代へ移動" : "移動する", "キャンセル")) return;
+        if (!await DisplayAlertAsync(isBackward ? "非公式の逆方向変換を確定" : plan.IsGenerationTransfer ? "世代をまたぐ移動を確定" : "移動を確定", $"{save.Game} / {save.TrainerName}\n{save.Boxes[index].Name} の {slot.Slot + 1}番へ移動します。選択したセーブを書き換え、成功後にバンクから取り除きます。{notices}", isBackward ? "逆方向変換して移動" : plan.IsGenerationTransfer ? $"第{plan.Pokemon.Generation}世代へ移動" : "移動する", "キャンセル")) return;
         await bank.MoveToSaveAsync(item.Entry.Id, target, new(false, index, slot.Slot), SHA256.HashData(data), transferDate);
         await Refresh();
         inspection.SelectPokemon(plan.Pokemon, $"{save.Game} / {save.TrainerName} / {save.Boxes[index].Name}へ移動しました");
