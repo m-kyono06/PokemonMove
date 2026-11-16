@@ -21,6 +21,7 @@ public interface IBankStore
     Task RestorePreviousAsync();
     Task MoveIntoBankAsync(ISaveDocument source, PokemonLocation location, byte[] expectedHash);
     Task MoveToSaveAsync(Guid entryId, ISaveDocument target, PokemonLocation location, byte[] expectedHash, DateOnly? transferDate = null);
+    Task MakeShinyAsync(ISaveDocument source, PokemonLocation location, byte[] expectedHash);
     Task RecoverMoveAsync(ISaveDocument document, bool restoreOriginal = false);
     Task<bool> HasPendingMoveAsync();
     Task<SaveBackup> LastSaveBackupAsync();

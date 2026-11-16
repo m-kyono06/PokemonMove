@@ -23,6 +23,19 @@ public sealed class Gen5SaveEditor : ISaveEditor
         else save.SetBoxSlotAtIndex(save.BlankPKM, location.Box, location.Slot, EntityImportSettings.None);
         return new(Finish(source, save, location), summary, Title(save), save.OT);
     }
+    public SaveEdit MakeShiny(byte[] source, PokemonLocation location)
+    {
+        var save = Open(source);
+        ValidateLocation(save, location);
+        var pk = location.IsParty ? save.GetPartySlotAtIndex(location.Slot) : save.GetBoxSlotAtIndex(location.Box, location.Slot);
+        var original = PokemonCodec.Describe(pk, location.Slot);
+        ValidateMovable(pk);
+        var shiny = ShinyPokemonChange.Apply(pk);
+        if (location.IsParty) save.SetPartySlotAtIndex(shiny, location.Slot, EntityImportSettings.None);
+        else save.SetBoxSlotAtIndex(shiny, location.Box, location.Slot, EntityImportSettings.None);
+        return new(Finish(source, save, location), original, Title(save), save.OT);
+    }
+
     public SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon, string formatKey = "pk4", DateOnly? transferDate = null)
     {
         var save = Open(source);

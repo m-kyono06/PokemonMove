@@ -25,6 +25,7 @@ public sealed class MainPage : ContentPage
     private PokemonLocation? selectedPosition;
     private readonly Label selected = new() { Text = "ポケモンを選択してください。", FontSize = 12, TextColor = Colors.White };
     private readonly Button deposit = new() { Text = "選択したポケモンをバンクへ移動", IsEnabled = false, FontSize = 13, BackgroundColor = Color.FromArgb("F2CF72"), TextColor = Color.FromArgb("253B50"), CornerRadius = 4 };
+    private readonly Button shiny = new() { Text = "選択した個体を色違いにする", IsEnabled = false, BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
     private ISaveDocument? sourceDocument;
     private byte[] sourceHash = [];
     private readonly Label status = new() { Text = "エミュレータを終了し、実際に使っている対応作品のセーブ（DS通常セーブ／XY・ORAS・サンムーン・USUMのmain）を選んでください。選択したファイルを書き換えます。", TextColor = Color.FromArgb("CCD7DC") };
@@ -70,13 +71,14 @@ public sealed class MainPage : ContentPage
         foreach (var button in new[] { open, bankButton, dexButton }) { button.FontSize = 12; button.Padding = 6; button.HeightRequest = 40; }
         actions.Add(open, 0); actions.Add(bankButton, 1); actions.Add(dexButton, 2);
         status.FontSize = 12;
+        shiny.Clicked += async (_, _) => { if (selectedPokemon is { } p && selectedPosition is { } position) await MakeShiny(p, position); };
         deposit.Clicked += async (_, _) => { if (selectedPokemon is { } p && selectedPosition is { } position) await ShowPokemon(p, position); };
         SizeChanged += (_, _) => { foreach (var button in slots.Children.OfType<Button>()) button.HeightRequest = SlotHeight; };
         Content = new ScrollView
         {
             Content = new VerticalStackLayout { Padding = 12, Spacing = 8, Children =
             {
-                RetroTheme.Heading("POKÉMON MOVE", "BOX TERMINAL"), actions, RetroTheme.Panel(status), location, RetroTheme.Panel(slots), selected, deposit,
+                RetroTheme.Heading("POKÉMON MOVE", "BOX TERMINAL"), actions, RetroTheme.Panel(status), location, RetroTheme.Panel(slots), selected, deposit, shiny,
                 new Label { Text = "操作前にエミュレータを終了してください。選択した実ファイルを書き換えます。2画面設定・登録一覧は右上メニューから開けます。", FontSize = 11, TextColor = Color.FromArgb("CCD7DC") }
             }}
         };
@@ -87,7 +89,7 @@ public sealed class MainPage : ContentPage
     {
         if (loading || storing) return;
         using var operation = operations.Begin();
-        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = false;
+        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = shiny.IsEnabled = false;
         try
         {
             var file = await RegisteredSavePicker.PickAsync(this, registry, documents, "表示するセーブを選択");
@@ -101,7 +103,7 @@ public sealed class MainPage : ContentPage
             status.Text = "セーブを読み込めません。「セーブを選ぶ」または登録セーブの管理から接続し直してください。";
             await DisplayAlertAsync("読み込みできませんでした", ex is InvalidDataException ? ex.Message : "ファイルの保存場所・アクセス権限を確認してください。", "閉じる");
         }
-        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; }
+        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; shiny.IsEnabled = selectedPokemon is { CanStore: true, IsShiny: false, IsEgg: false }; }
     }
 
     protected override async void OnAppearing()
@@ -114,13 +116,13 @@ public sealed class MainPage : ContentPage
     {
         if (storing || loading) return;
         using var operation = operations.Begin();
-        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = false;
+        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = shiny.IsEnabled = false;
         try
         {
             if (await bank.HasPendingMoveAsync())
             {
                 ClearSaveDisplay();
-                status.Text = "中断した移動があります。バンクから先に復旧してください。";
+                status.Text = "中断した操作があります。バンクから先に復旧してください。";
                 return;
             }
             var registered = await registry.ListAsync();
@@ -141,7 +143,7 @@ public sealed class MainPage : ContentPage
             ClearSaveDisplay();
             status.Text = "自動で読み込めませんでした。「セーブを選ぶ」か登録セーブの管理から接続し直してください。";
         }
-        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; }
+        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; shiny.IsEnabled = selectedPokemon is { CanStore: true, IsShiny: false, IsEgg: false }; }
     }
 
     private void ApplySave(OpenedRegisteredSave opened)
@@ -170,7 +172,7 @@ public sealed class MainPage : ContentPage
     {
         slots.Children.Clear();
         inspection.Clear();
-        selectedPokemon = null; selectedPosition = null; deposit.IsEnabled = false;
+        selectedPokemon = null; selectedPosition = null; deposit.IsEnabled = shiny.IsEnabled = false;
         selected.Text = "ポケモンを選択してください。";
         if (snapshot is null || location.SelectedIndex < 0) return;
         var selectedLocation = location.SelectedIndex;
@@ -189,7 +191,7 @@ public sealed class MainPage : ContentPage
                 if (loading || storing || !ReferenceEquals(snapshot, renderedSave)) return false;
                 RetroTheme.SelectSlot(slots, button);
                 selectedPokemon = p; selectedPosition = new(selectedLocation == 0, selectedLocation - 1, p.Slot);
-                selected.Text = $"選択：{p.Name} Lv.{p.Level}"; deposit.IsEnabled = p.CanStore;
+                selected.Text = $"選択：{p.Name} Lv.{p.Level}"; deposit.IsEnabled = p.CanStore; shiny.IsEnabled = p.CanStore && !p.IsEgg && !p.IsShiny;
                 inspection.SelectPokemon(p, $"{snapshot.Game} / {snapshot.TrainerName} / {(selectedLocation == 0 ? "手持ち" : snapshot.Boxes[selectedLocation - 1].Name)}");
                 return true;
             }
@@ -205,11 +207,40 @@ public sealed class MainPage : ContentPage
         }
     }
 
+    private async Task MakeShiny(PokemonSummary pokemon, PokemonLocation position)
+    {
+        if (storing || loading || sourceDocument is null || snapshot is null) return;
+        using var operation = operations.Begin();
+        storing = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = shiny.IsEnabled = false;
+        try
+        {
+            var plan = ShinyPokemonChange.Prepare(pokemon);
+            if (!await DisplayAlertAsync("色違い化を確認", $"{snapshot.Game} / {snapshot.TrainerName}\n{pokemon.Name} Lv.{pokemon.Level}\n\n" + string.Join("\n\n", plan.Notices), "色違いにする", "キャンセル")) return;
+            await bank.MakeShinyAsync(sourceDocument, position, sourceHash);
+            var updated = await sourceDocument.ReadAsync();
+            snapshot = await Task.Run(() => reader.Read(updated)); sourceHash = SHA256.HashData(updated);
+            var changed = position.IsParty ? snapshot.Party[position.Slot] : snapshot.Boxes[position.Box].Slots[position.Slot];
+            RenderSlots(); inspection.SelectPokemon(changed, "セーブ内の個体を色違いに変更しました");
+            status.Text = $"{snapshot.Game} / {snapshot.TrainerName}\n{changed.Name}を色違いに変更しました。";
+            await DisplayAlertAsync("変更完了", "同じ位置の個体を色違いに変更しました。変更前のセーブはバンク画面からバックアップを書き出せます。", "閉じる");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            await DisplayAlertAsync("変更できませんでした", ex is InvalidDataException ? ex.Message : "書き込みが中断した可能性があります。バンク画面から復旧してください。", "閉じる");
+        }
+        finally
+        {
+            storing = false; open.IsEnabled = slots.IsEnabled = true;
+            deposit.IsEnabled = selectedPokemon?.CanStore == true;
+            shiny.IsEnabled = selectedPokemon is { CanStore: true, IsShiny: false, IsEgg: false };
+        }
+    }
+
     private async Task ShowPokemon(PokemonSummary pokemon, PokemonLocation position)
     {
         if (storing || loading || snapshot is null || sourceDocument is null) return;
         using var operation = operations.Begin();
-        storing = true;
+        storing = true; shiny.IsEnabled = false;
         open.IsEnabled = false;
         slots.IsEnabled = false;
         try
@@ -235,7 +266,7 @@ public sealed class MainPage : ContentPage
         {
             await DisplayAlertAsync("保管できませんでした", ex is InvalidDataException ? ex.Message : "保存先へのアクセスを確認してください。中断した可能性があります。バンク画面で復旧を確認してください。", "閉じる");
         }
-        finally { storing = false; open.IsEnabled = true; slots.IsEnabled = true; }
+        finally { storing = false; open.IsEnabled = true; slots.IsEnabled = true; shiny.IsEnabled = selectedPokemon is { CanStore: true, IsShiny: false, IsEgg: false }; }
     }
 
 }

@@ -30,6 +30,27 @@ public sealed class Gen7SaveEditor : ISaveEditor
         else save.SetBoxSlotAtIndex(save.BlankPKM, location.Box, location.Slot, EntityImportSettings.None);
         return new(Finish(save, location), summary, Gen7SaveReader.Title(save), save.OT);
     }
+    public SaveEdit MakeShiny(byte[] source, PokemonLocation location)
+    {
+        var save = Open(source);
+        ValidateLocation(save, location);
+        var pk = location.IsParty ? save.GetPartySlotAtIndex(location.Slot) : save.GetBoxSlotAtIndex(location.Box, location.Slot);
+        var original = PokemonCodec.Describe(pk, location.Slot);
+        ValidateMovable(pk);
+        // Resort slots hold separate copies of active participants. Never leave one behind.
+        for (var i = 0; i < ResortSave7.ResortCount; i++)
+        {
+            var active = new PK7(save.ResortSave[i].ToArray());
+            if (active.Species != 0 && active.Species == pk.Species && active.PID == pk.PID
+                && active.ID32 == pk.ID32 && active.EncryptionConstant == pk.EncryptionConstant)
+                throw new InvalidDataException("ポケリゾートにいる個体は、ゲーム内で戻してから移動してください。");
+        }
+        var shiny = ShinyPokemonChange.Apply(pk);
+        if (location.IsParty) save.SetPartySlotAtIndex(shiny, location.Slot, EntityImportSettings.None);
+        else save.SetBoxSlotAtIndex(shiny, location.Box, location.Slot, EntityImportSettings.None);
+        return new(Finish(save, location), original, Gen7SaveReader.Title(save), save.OT);
+    }
+
     public SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon, string formatKey = "pk4", DateOnly? transferDate = null)
     {
         var save = Open(source);

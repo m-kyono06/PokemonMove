@@ -30,6 +30,20 @@ public sealed class Gen4SaveEditor : ISaveEditor
         return new(Finish(source, save), summary, snapshot.Game, snapshot.TrainerName);
     }
 
+    public SaveEdit MakeShiny(byte[] source, PokemonLocation location)
+    {
+        var (save, snapshot) = Open(source);
+        ValidateLocation(save, location);
+        var pk = location.IsParty ? save.GetPartySlotAtIndex(location.Slot) : save.GetBoxSlotAtIndex(location.Box, location.Slot);
+        var original = PokemonCodec.Describe(pk, location.Slot);
+        if (ItemStorage4.Mail.Contains((ushort)pk.HeldItem)) throw new InvalidDataException("メールを持つ個体は先にゲーム内で外してください。");
+        var shiny = ShinyPokemonChange.Apply(pk);
+        if (location.IsParty) save.SetPartySlotAtIndex(shiny, location.Slot, EntityImportSettings.None);
+        else save.SetBoxSlotAtIndex(shiny, location.Box, location.Slot, EntityImportSettings.None);
+        if (!location.IsParty && save is SAV4HGSS hgss) hgss.FlagsBoxContentChanged |= 1 << location.Box;
+        return new(Finish(source, save), original, snapshot.Game, snapshot.TrainerName);
+    }
+
     public SaveEdit Insert(byte[] source, PokemonLocation location, byte[] pokemon, string formatKey = "pk4", DateOnly? transferDate = null)
     {
         var (save, snapshot) = Open(source);

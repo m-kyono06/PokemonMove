@@ -22,3 +22,9 @@ public interface ISaveEditor
 public sealed class SaveRecoveryRequiredException(string message) : IOException(message);
 
 public sealed record PokemonTransferPlan(PokemonSummary Pokemon, bool IsGenerationTransfer, IReadOnlyList<string> Notices);
+
+public interface ISaveShinyEditor
+{
+    SaveEdit MakeShiny(byte[] source, PokemonLocation location);
+}
+public sealed record ShinyPokemonPlan(PokemonSummary Pokemon, IReadOnlyList<string> Notices);

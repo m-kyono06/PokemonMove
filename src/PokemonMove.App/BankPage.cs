@@ -28,7 +28,7 @@ public sealed class BankPage : ContentPage
     private readonly Grid slots = new() { ColumnSpacing = 5, RowSpacing = 5 };
     private readonly Button export = ActionButton("バックアップを書き出す");
     private readonly Button import = ActionButton("バックアップを取り込む");
-    private readonly Button recover = ActionButton("中断した移動を復旧する");
+    private readonly Button recover = ActionButton("中断した操作を復旧する");
     private readonly Button exportSave = ActionButton("直前のセーブのバックアップを書き出す");
 
     public BankPage(IBankStore bank, ISaveDocuments documents, ISaveReader reader, IRegisteredSaves registry, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
@@ -72,8 +72,8 @@ public sealed class BankPage : ContentPage
         });
         recover.Clicked += async (_, _) => await Run(async () =>
         {
-            if (!await bank.HasPendingMoveAsync()) { await DisplayAlertAsync("移動の復旧", "中断した移動はありません。", "閉じる"); return; }
-            await DisplayAlertAsync("移動の復旧", "エミュレータを終了し、中断した移動で選択した同じセーブを指定してください。", "選択する");
+            if (!await bank.HasPendingMoveAsync()) { await DisplayAlertAsync("操作の復旧", "中断した操作はありません。", "閉じる"); return; }
+            await DisplayAlertAsync("操作の復旧", "エミュレータを終了し、中断した操作で選択した同じセーブを指定してください。", "選択する");
             var file = await RegisteredSavePicker.PickAsync(this, registry, documents, "復旧するセーブを選択");
             if (file is null) return;
             try { await bank.RecoverMoveAsync(file); }
@@ -127,7 +127,7 @@ public sealed class BankPage : ContentPage
         var query = search.Text?.Trim() ?? "";
         filtered = items.Where(i => query.Length == 0 || i.Pokemon.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || i.Pokemon.Nickname.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
         status.Text = $"保管：{items.Count}匹 / 表示：{filtered.Count}匹" + (items.Count == 0 ? "\nセーブ内のポケモンを選び、バンクへ移動できます。" : "");
-        if (pendingMove) status.Text += "\n中断した移動があります。先に復旧してください。";
+        if (pendingMove) status.Text += "\n中断した操作があります。先に復旧してください。";
         box.Items.Clear();
         for (var i = 0; i < Math.Max(1, (filtered.Count + 29) / 30); i++) box.Items.Add($"バンクボックス {i + 1}");
         box.SelectedIndex = 0;

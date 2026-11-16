@@ -12,7 +12,7 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     private readonly string path = Path.Combine(directory, "bank.json");
     private readonly SemaphoreSlim gate = new(1, 1);
     private sealed record PendingMove(Guid Id, string DocumentId, bool Deposit, PokemonLocation Location,
-        BankEntry Entry, byte[] Before, byte[] After, DateOnly? TransferDate = null);
+        BankEntry Entry, byte[] Before, byte[] After, DateOnly? TransferDate = null, bool Shiny = false);
     private sealed record Document(int Version, List<BankEntry> Entries, List<Guid>? Spent = null, PendingMove? Pending = null);
 
     public async Task<IReadOnlyList<BankItem>> ListAsync()
@@ -162,6 +162,23 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         finally { gate.Release(); }
     }
 
+    public async Task MakeShinyAsync(ISaveDocument source, PokemonLocation location, byte[] expectedHash)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            var doc = await ReadAsync(); EnsureIdle(doc);
+            var before = await source.ReadAsync(); CheckExpected(before, expectedHash);
+            var edit = (RequireEditor() as ISaveShinyEditor
+                ?? throw new InvalidDataException("色違い化のエンジンが設定されていません。")).MakeShiny(before, location);
+            // This is journal context only, never a new bank owner or an extra Pokemon.
+            var context = new BankEntry(Guid.NewGuid(), edit.Game, edit.Trainer, DateTimeOffset.UtcNow, edit.Pokemon.StoredData)
+                { FormatKey = edit.Pokemon.FormatKey, TransferEligible = true };
+            await ExecuteAsync(doc, new(Guid.NewGuid(), source.Id, false, location, context, before, edit.After, Shiny: true), source);
+        }
+        finally { gate.Release(); }
+    }
+
     public async Task MoveToSaveAsync(Guid entryId, ISaveDocument target, PokemonLocation location, byte[] expectedHash, DateOnly? transferDate = null)
     {
         await gate.WaitAsync();
@@ -196,8 +213,8 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         try
         {
             var doc = await ReadAsync();
-            var pending = doc.Pending ?? throw new InvalidDataException("中断した移動はありません。");
-            if (document.Id != pending.DocumentId) throw new InvalidDataException("中断した移動で選択した同じセーブを選んでください。");
+            var pending = doc.Pending ?? throw new InvalidDataException("中断した操作はありません。");
+            if (document.Id != pending.DocumentId) throw new InvalidDataException("中断した操作で選択した同じセーブを選んでください。");
             byte[]? current;
             try { current = await document.ReadAsync(); }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -221,6 +238,11 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     private async Task CommitAsync(Document doc)
     {
         var pending = doc.Pending!;
+        if (pending.Shiny)
+        {
+            await WriteAsync(doc with { Pending = null });
+            return;
+        }
         if (pending.Deposit)
         {
             var hash = Fingerprint(pending.Entry.Data, pending.Entry.FormatKey);
@@ -291,11 +313,11 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
     private static void CheckExpected(byte[] data, byte[] expected)
     {
         if (!SHA256.HashData(data).AsSpan().SequenceEqual(expected))
-            throw new InvalidDataException("セーブの内容が変わったか書き込みを確認できません。開き直してください。中断した移動がある場合は、バンク画面から先に復旧してください。");
+            throw new InvalidDataException("セーブの内容が変わったか書き込みを確認できません。開き直してください。中断した操作がある場合は、バンク画面から先に復旧してください。");
     }
     private static void EnsureIdle(Document doc)
     {
-        if (doc.Pending is not null) throw new InvalidDataException("中断した移動があります。先にバンク画面で復旧してください。");
+        if (doc.Pending is not null) throw new InvalidDataException("中断した操作があります。先にバンク画面で復旧してください。");
     }
 
     private async Task<Document> ReadAsync()
@@ -346,11 +368,15 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
         {
             if (editor is null || pending.Id == Guid.Empty || string.IsNullOrWhiteSpace(pending.DocumentId) ||
                 pending.Before is null || pending.After is null || pending.Entry is null || !pending.Entry.TransferEligible)
-                throw new InvalidDataException("中断した移動の情報を確認できません。");
-            var edit = pending.Deposit ? editor.Remove(pending.Before, pending.Location) : editor.Insert(pending.Before, pending.Location, pending.Entry.Data, pending.Entry.FormatKey, pending.TransferDate);
+                throw new InvalidDataException("中断した操作の情報を確認できません。");
+            if (pending.Shiny && (pending.Deposit || pending.TransferDate is not null || doc.Entries.Any(e => e.Id == pending.Entry.Id)))
+                throw new InvalidDataException("色違い化の中断情報が不正です。");
+            var edit = pending.Shiny
+                ? (editor as ISaveShinyEditor ?? throw new InvalidDataException("色違い化の復旧には対応版が必要です。")).MakeShiny(pending.Before, pending.Location)
+                : pending.Deposit ? editor.Remove(pending.Before, pending.Location) : editor.Insert(pending.Before, pending.Location, pending.Entry.Data, pending.Entry.FormatKey, pending.TransferDate);
             if (!edit.After.AsSpan().SequenceEqual(pending.After) || !edit.Pokemon.StoredData.AsSpan().SequenceEqual(pending.Entry.Data) || edit.Pokemon.FormatKey != pending.Entry.FormatKey)
-                throw new InvalidDataException("中断した移動の整合性を確認できません。");
-            if (!pending.Deposit && !doc.Entries.Any(e => e.Id == pending.Entry.Id && e.TransferEligible && e.FormatKey == pending.Entry.FormatKey && e.Data.AsSpan().SequenceEqual(pending.Entry.Data)))
+                throw new InvalidDataException("中断した操作の整合性を確認できません。");
+            if (!pending.Shiny && !pending.Deposit && !doc.Entries.Any(e => e.Id == pending.Entry.Id && e.TransferEligible && e.FormatKey == pending.Entry.FormatKey && e.Data.AsSpan().SequenceEqual(pending.Entry.Data)))
                 throw new InvalidDataException("中断した引き出しの保管データが見つかりません。");
         }
         return doc;
