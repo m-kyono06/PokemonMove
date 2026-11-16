@@ -24,4 +24,5 @@ public interface IBankStore
     Task RecoverMoveAsync(ISaveDocument document, bool restoreOriginal = false);
     Task<bool> HasPendingMoveAsync();
     Task<SaveBackup> LastSaveBackupAsync();
+    Task<IReadOnlyList<BankItem>> EvolveTradeAsync(Guid entryId, byte[] expectedHash, Guid? partnerId = null, byte[]? expectedPartnerHash = null);
 }

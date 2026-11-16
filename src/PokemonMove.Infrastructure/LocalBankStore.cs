@@ -5,7 +5,7 @@ using PokemonMove.Domain;
 namespace PokemonMove.Infrastructure;
 
 /// <summary>App-private bank. One instance owns all access; reads never erase damaged files.</summary>
-public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveEditor? editor = null) : IBankStore
+public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveEditor? editor = null, ITradeEvolution? evolution = null) : IBankStore
 {
     public const int MaximumBackupBytes = 8 * 1024 * 1024;
     public const int MaximumEntries = 10000;
@@ -40,6 +40,51 @@ public sealed class LocalBankStore(string directory, IPokemonCodec codec, ISaveE
             doc.Entries.Add(entry);
             await WriteAsync(doc);
             return new(ToItem(entry), true);
+        }
+        finally { gate.Release(); }
+    }
+
+    public async Task<IReadOnlyList<BankItem>> EvolveTradeAsync(Guid entryId, byte[] expectedHash, Guid? partnerId = null, byte[]? expectedPartnerHash = null)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            var doc = await ReadAsync(); EnsureIdle(doc);
+            var first = doc.Entries.SingleOrDefault(e => e.Id == entryId)
+                ?? throw new InvalidDataException("バンクに個体が見つかりません。選び直してください。");
+            BankEntry? second = null;
+            if (partnerId is { } partner)
+            {
+                if (partner == entryId) throw new InvalidDataException("同じ個体を相手にはできません。");
+                second = doc.Entries.SingleOrDefault(e => e.Id == partner)
+                    ?? throw new InvalidDataException("相手の個体がバンクに見つかりません。");
+                if (expectedPartnerHash is null) throw new InvalidDataException("相手の確認情報がありません。選び直してください。");
+                CheckExpected(second.Data, expectedPartnerHash);
+            }
+            CheckExpected(first.Data, expectedHash);
+            if (!first.TransferEligible || second is { TransferEligible: false })
+                throw new InvalidDataException("旧版のコピー保管は進化できません。元セーブから移動保管した個体を選んでください。");
+            var plan = (evolution ?? throw new InvalidDataException("通信進化のエンジンが設定されていません。"))
+                .Prepare(ToItem(first).Pokemon, second is null ? null : ToItem(second).Pokemon);
+            if ((second is null) != (plan.Partner is null)) throw new InvalidDataException("通信進化の相手情報が一致しません。");
+            BankEntry Replace(BankEntry entry, PokemonSummary result)
+            {
+                if (result.FormatKey != entry.FormatKey || !result.CanStore)
+                    throw new InvalidDataException("進化後の保存形式を確認できません。");
+                return entry with { Id = Guid.NewGuid(), Data = codec.Decode(result.StoredData.ToArray(), result.FormatKey).StoredData };
+            }
+            var updated = new List<BankEntry> { Replace(first, plan.Pokemon) };
+            if (second is not null) updated.Add(Replace(second, plan.Partner!));
+            // Both replacements and consumption of the old identities commit in one atomic bank write.
+            // Old backups cannot resurrect a pre-evolution owner alongside its evolved replacement.
+            var consumed = new[] { first.Id }.Concat(second is null ? [] : new[] { second.Id }).ToHashSet();
+            var hashes = doc.Entries.Where(e => !consumed.Contains(e.Id)).Select(e => Fingerprint(e.Data, e.FormatKey)).ToHashSet();
+            if (updated.Any(e => !hashes.Add(Fingerprint(e.Data, e.FormatKey))))
+                throw new InvalidDataException("進化後と同じデータの個体がすでにバンクに存在するため、通信進化できません。");
+            var entries = doc.Entries.Select(e => e.Id == first.Id ? updated[0] : second is not null && e.Id == second.Id ? updated[1] : e).ToList();
+            await MarkTransfersAsync();
+            await WriteAsync(doc with { Entries = entries, Spent = doc.Spent!.Union(consumed).ToList() });
+            return updated.Select(ToItem).ToArray();
         }
         finally { gate.Release(); }
     }

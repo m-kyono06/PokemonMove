@@ -17,6 +17,7 @@ public sealed class BankPage : ContentPage
     private BankItem? selectedItem;
     private readonly Label selected = new() { Text = "ポケモンを選択してください。", TextColor = Colors.White, FontSize = 12 };
     private readonly Button withdraw = ActionButton("選択したポケモンをセーブへ移動");
+    private readonly Button evolve = ActionButton("選択したポケモンを通信進化");
     private bool pendingMove;
     private IReadOnlyList<BankItem> items = [];
     private List<BankItem> filtered = [];
@@ -91,7 +92,8 @@ public sealed class BankPage : ContentPage
             await File.WriteAllBytesAsync(file, backup.Data);
             await Share.Default.RequestAsync(new ShareFileRequest { Title = "移動前のセーブを保存", File = new ShareFile(file, "application/octet-stream") });
         });
-        withdraw.IsEnabled = false;
+        withdraw.IsEnabled = false; evolve.IsEnabled = false;
+        evolve.Clicked += async (_, _) => { if (selectedItem is { } item) await Run(() => Evolve(item)); };
         withdraw.Clicked += async (_, _) => { if (selectedItem is { } item) await Run(() => Withdraw(item)); };
         SizeChanged += (_, _) => { foreach (var button in slots.Children.OfType<Button>()) button.HeightRequest = SlotHeight; };
         Content = new ScrollView { Content = new VerticalStackLayout
@@ -99,7 +101,7 @@ public sealed class BankPage : ContentPage
             Padding = 12, Spacing = 8,
             Children =
             {
-                RetroTheme.Heading("ローカルバンク", "POKÉMON STORAGE"), status, search, box, RetroTheme.Panel(slots), selected, withdraw,
+                RetroTheme.Heading("ローカルバンク", "POKÉMON STORAGE"), status, search, box, RetroTheme.Panel(slots), selected, withdraw, evolve,
                 new Label { Text = "移動保管した個体は、保管元を含む対応セーブへ引き出せます。第4→第5、第5→第6、第6→第7世代の変換に対応します。第5〜第7世代から以前の世代へは、対応する個体のみ非公式の逆方向変換ができます。出身情報の変更・記録の消失は実行前に確認してください。旧版のコピーはそのまま引き出せません。\n\nアプリの削除・端末変更の前にバックアップを書き出して保管してください。", TextColor = Colors.LightGray, FontSize = 13 },
                 export, import, exportSave, recover
             }
@@ -135,7 +137,7 @@ public sealed class BankPage : ContentPage
     {
         slots.Children.Clear();
         inspection.Clear();
-        selectedItem = null; withdraw.IsEnabled = false; selected.Text = "ポケモンを選択してください。";
+        selectedItem = null; withdraw.IsEnabled = evolve.IsEnabled = false; selected.Text = "ポケモンを選択してください。";
         if (box.SelectedIndex < 0) return;
         var page = filtered.Skip(box.SelectedIndex * 30).Take(30).ToArray();
         for (var i = 0; i < page.Length; i++)
@@ -146,7 +148,7 @@ public sealed class BankPage : ContentPage
             {
                 if (busy) return false;
                 RetroTheme.SelectSlot(slots, button);
-                selectedItem = item; withdraw.IsEnabled = item.Entry.TransferEligible && !pendingMove;
+                selectedItem = item; withdraw.IsEnabled = evolve.IsEnabled = item.Entry.TransferEligible && !pendingMove;
                 selected.Text = $"選択：{item.Pokemon.Name} Lv.{item.Pokemon.Level}（第{item.Pokemon.Generation}世代）" + (item.Entry.TransferEligible ? "" : "（旧コピー）");
                 inspection.SelectPokemon(item.Pokemon, $"バンク / 保管元：{item.Entry.SourceGame}");
                 return true;
@@ -167,14 +169,37 @@ public sealed class BankPage : ContentPage
     {
         if (busy) return;
         using var operation = operations.Begin();
-        busy = true;
+        busy = true; evolve.IsEnabled = false;
         export.IsEnabled = import.IsEnabled = exportSave.IsEnabled = recover.IsEnabled = false;
         try { await action(); }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         {
             await DisplayAlertAsync("バンクを処理できませんでした", ex is InvalidDataException ? ex.Message : "保存先の空き容量・アクセス権限を確認してください。", "閉じる");
         }
-        finally { busy = false; export.IsEnabled = import.IsEnabled = exportSave.IsEnabled = recover.IsEnabled = true; }
+        finally { busy = false; evolve.IsEnabled = selectedItem is { Entry.TransferEligible: true } && !pendingMove; export.IsEnabled = import.IsEnabled = exportSave.IsEnabled = recover.IsEnabled = true; }
+    }
+
+    private async Task Evolve(BankItem item)
+    {
+        BankItem? partner = null;
+        if (item.Pokemon.Species is 588 or 616)
+        {
+            var species = item.Pokemon.Species == 588 ? 616 : 588;
+            var candidates = items.Where(i => i.Entry.Id != item.Entry.Id && i.Entry.TransferEligible
+                && i.Pokemon.Species == species && i.Entry.FormatKey == item.Entry.FormatKey).ToArray();
+            if (candidates.Length == 0) throw new InvalidDataException("同じ保存世代のカブルモとチョボマキを両方バンクへ移動保管してください。");
+            var choices = candidates.Select((i, n) => $"{n + 1}: {i.Pokemon.Name} / {i.Pokemon.Nickname} Lv.{i.Pokemon.Level} / {i.Entry.SourceGame} / {i.Entry.SourceTrainer}").ToArray();
+            var choice = await DisplayActionSheetAsync("通信進化の相手を選択", "キャンセル", null, choices);
+            var index = Array.IndexOf(choices, choice); if (index < 0) return;
+            partner = candidates[index];
+        }
+        var plan = new TradeEvolution().Prepare(item.Pokemon, partner?.Pokemon);
+        if (!await DisplayAlertAsync("通信進化を確認", string.Join("\n\n", plan.Notices), "通信進化する", "キャンセル")) return;
+        var results = await Task.Run(() => bank.EvolveTradeAsync(item.Entry.Id, SHA256.HashData(item.Pokemon.StoredData),
+            partner?.Entry.Id, partner is null ? null : SHA256.HashData(partner.Pokemon.StoredData)));
+        await Refresh();
+        inspection.SelectPokemon(results[0].Pokemon, "バンク / 通信進化後");
+        await DisplayAlertAsync("通信進化完了", string.Join("・", results.Select(i => i.Pokemon.Name)) + "へ進化しました。セーブへ引き出して利用できます。", "閉じる");
     }
 
     private async Task Withdraw(BankItem item)
