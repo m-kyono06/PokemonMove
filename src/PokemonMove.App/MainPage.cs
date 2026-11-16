@@ -1,11 +1,14 @@
 using PokemonMove.Domain;
 using PokemonMove.Engine;
+using PokemonMove.Infrastructure;
 using System.Security.Cryptography;
 
 namespace PokemonMove.App;
 
 public sealed class MainPage : ContentPage
 {
+    private const string LastSaveKey = "save.last-home-document";
+    private readonly RegisteredSaveAccess saveAccess;
     private readonly ISaveReader reader;
     private SaveSnapshot? snapshot;
     private readonly IBankStore bank;
@@ -32,6 +35,7 @@ public sealed class MainPage : ContentPage
     public MainPage(ISaveReader reader, IBankStore bank, ISaveDocuments documents, ICollectionDex dex, IRegisteredSaves registry, ISaveLibraryReader library, IPokemonInspection inspection, IDualScreenManager dual, UserOperations operations)
     {
         this.reader = reader;
+        saveAccess = new(registry, documents, reader);
         this.bank = bank;
         this.documents = documents;
         this.dex = dex;
@@ -48,7 +52,7 @@ public sealed class MainPage : ContentPage
         location.SelectedIndexChanged += (_, _) => RenderSlots();
         location.IsVisible = false;
         var bankButton = new Button { Text = "ローカルバンクを開く", BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
-        bankButton.Clicked += async (_, _) => await Navigation.PushAsync(new BankPage(bank, documents, reader, registry, inspection, dual, operations));
+        bankButton.Clicked += async (_, _) => { if (!loading && !storing) await Navigation.PushAsync(new BankPage(bank, documents, reader, registry, inspection, dual, operations)); };
         var dexButton = new Button { Text = "収集図鑑を開く", BackgroundColor = Color.FromArgb("45637B"), TextColor = Colors.White, CornerRadius = 4 };
         dexButton.Clicked += async (_, _) =>
         {
@@ -62,7 +66,7 @@ public sealed class MainPage : ContentPage
         screensItem.Clicked += async (_, _) => { if (!loading && !storing) await Navigation.PushAsync(new DualScreenSettingsPage(dual)); };
         ToolbarItems.Add(screensItem);
         var actions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 6 };
-        open.Text = "セーブを開く"; bankButton.Text = "バンク"; dexButton.Text = "収集図鑑";
+        open.Text = "セーブを選ぶ"; bankButton.Text = "バンク"; dexButton.Text = "収集図鑑";
         foreach (var button in new[] { open, bankButton, dexButton }) { button.FontSize = 12; button.Padding = 6; button.HeightRequest = 40; }
         actions.Add(open, 0); actions.Add(bankButton, 1); actions.Add(dexButton, 2);
         status.FontSize = 12;
@@ -83,57 +87,83 @@ public sealed class MainPage : ContentPage
     {
         if (loading || storing) return;
         using var operation = operations.Begin();
-        loading = true;
-        open.IsEnabled = false;
-        slots.IsEnabled = false;
+        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = false;
         try
         {
-            var file = await documents.PickAsync();
+            var file = await RegisteredSavePicker.PickAsync(this, registry, documents, "表示するセーブを選択");
             if (file is null) return;
             status.Text = "セーブを読み込み中…";
-            var data = await file.ReadAsync();
-            var loaded = await Task.Run(() => reader.Read(data));
-            await registry.RegisterAsync(file.Id, loaded);
-            inspection.Clear();
-            sourceDocument = file;
-            sourceHash = SHA256.HashData(data);
-            snapshot = loaded;
-            location.Items.Clear();
-            location.Items.Add($"手持ち（{loaded.Party.Count}匹）");
-            foreach (var box in loaded.Boxes) location.Items.Add(box.Name);
-            location.IsVisible = true;
-            location.SelectedIndex = 0;
-            status.Text = $"{loaded.Game}\nトレーナー：{loaded.TrainerName}" +
-                (loaded.Warnings.Count == 0 ? "" : "\n追加領域に警告あり。手持ち・ボックスは正常です。");
+            ApplySave(await saveAccess.OpenAsync(file));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            status.Text = snapshot is null ? "セーブを開けませんでした。別のファイルをお試しください。" : $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}（前のセーブを表示中）";
-            await DisplayAlertAsync("読み込みできませんでした", ex is InvalidDataException ? ex.Message : "ファイルの内容またはアクセス権限を確認してください。", "閉じる");
+            ClearSaveDisplay();
+            status.Text = "セーブを読み込めません。「セーブを選ぶ」または登録セーブの管理から接続し直してください。";
+            await DisplayAlertAsync("読み込みできませんでした", ex is InvalidDataException ? ex.Message : "ファイルの保存場所・アクセス権限を確認してください。", "閉じる");
         }
-        finally { loading = false; open.IsEnabled = true; slots.IsEnabled = true; }
+        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; }
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (sourceDocument is null || storing || loading) return;
+        await RefreshRegisteredSaveAsync();
+    }
+
+    internal async Task RefreshRegisteredSaveAsync()
+    {
+        if (storing || loading) return;
         using var operation = operations.Begin();
-        loading = true;
-        open.IsEnabled = false;
-        slots.IsEnabled = false;
+        loading = true; open.IsEnabled = slots.IsEnabled = deposit.IsEnabled = false;
         try
         {
-            var data = await sourceDocument.ReadAsync();
-            snapshot = await Task.Run(() => reader.Read(data));
-            sourceHash = SHA256.HashData(data);
-            status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}" + (snapshot.Warnings.Count == 0 ? "" : "\n追加領域に警告あり。手持ち・ボックスは正常です。");
-            if (location.Items.Count > 0) location.Items[0] = $"手持ち（{snapshot.Party.Count}匹）";
-            RenderSlots();
+            if (await bank.HasPendingMoveAsync())
+            {
+                ClearSaveDisplay();
+                status.Text = "中断した移動があります。バンクから先に復旧してください。";
+                return;
+            }
+            var registered = await registry.ListAsync();
+            var last = Preferences.Default.Get(LastSaveKey, "");
+            var saved = RegisteredSaveSelection.ForAutomaticOpen(registered, last);
+            if (saved is null)
+            {
+                ClearSaveDisplay();
+                status.Text = last.Length == 0 ? "「セーブを選ぶ」からセーブを登録してください。次回から自動で読み込みます。"
+                    : "前回のセーブの登録がありません。「セーブを選ぶ」から開き直してください。";
+                return;
+            }
+            status.Text = $"{saved.Game} / {saved.Trainer} を読み込み中…";
+            ApplySave(await saveAccess.OpenAsync(saved.DocumentId));
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-        { status.Text = "セーブを再読み込みできません。開き直すか、中断した移動をバンク画面で復旧してください。"; }
-        finally { loading = false; open.IsEnabled = true; slots.IsEnabled = true; }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            ClearSaveDisplay();
+            status.Text = "自動で読み込めませんでした。「セーブを選ぶ」か登録セーブの管理から接続し直してください。";
+        }
+        finally { loading = false; open.IsEnabled = slots.IsEnabled = true; deposit.IsEnabled = selectedPokemon?.CanStore == true; }
+    }
+
+    private void ApplySave(OpenedRegisteredSave opened)
+    {
+        var previousBox = sourceDocument?.Id == opened.Document.Id ? location.SelectedIndex : 0;
+        snapshot = opened.Save; sourceDocument = opened.Document; sourceHash = SHA256.HashData(opened.Data);
+        Preferences.Default.Set(LastSaveKey, opened.Document.Id);
+        location.Items.Clear();
+        location.Items.Add($"手持ち（{snapshot.Party.Count}匹）");
+        foreach (var box in snapshot.Boxes) location.Items.Add(box.Name);
+        location.IsVisible = true;
+        location.SelectedIndex = Math.Clamp(previousBox, 0, snapshot.Boxes.Count);
+        RenderSlots();
+        status.Text = $"{snapshot.Game}\nトレーナー：{snapshot.TrainerName}（最新のセーブを読み込み済み）"
+            + (snapshot.Warnings.Count == 0 ? "" : "\n追加領域に警告あり。手持ち・ボックスは正常です。");
+    }
+
+    private void ClearSaveDisplay()
+    {
+        snapshot = null; sourceDocument = null; sourceHash = [];
+        location.Items.Clear(); location.IsVisible = false;
+        RenderSlots();
     }
 
     private void RenderSlots()

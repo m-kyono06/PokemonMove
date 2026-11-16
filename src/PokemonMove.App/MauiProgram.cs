@@ -36,6 +36,10 @@ public sealed class App(IServiceProvider services) : Application
     {
         Resources = RetroTheme.Resources();
         UserAppTheme = AppTheme.Light;
-        return new(new NavigationPage(services.GetRequiredService<MainPage>()) { BarBackgroundColor = Color.FromArgb("253B50"), BarTextColor = Colors.White });
+        var home = services.GetRequiredService<MainPage>();
+        var navigation = new NavigationPage(home) { BarBackgroundColor = Color.FromArgb("253B50"), BarTextColor = Colors.White };
+        var window = new Window(navigation);
+        window.Resumed += async (_, _) => { if (navigation.CurrentPage == home) await home.RefreshRegisteredSaveAsync(); };
+        return window;
     }
 }

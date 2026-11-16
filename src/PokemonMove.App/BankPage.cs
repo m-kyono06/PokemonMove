@@ -74,7 +74,7 @@ public sealed class BankPage : ContentPage
         {
             if (!await bank.HasPendingMoveAsync()) { await DisplayAlertAsync("移動の復旧", "中断した移動はありません。", "閉じる"); return; }
             await DisplayAlertAsync("移動の復旧", "エミュレータを終了し、中断した移動で選択した同じセーブを指定してください。", "選択する");
-            var file = await documents.PickAsync();
+            var file = await RegisteredSavePicker.PickAsync(this, registry, documents, "復旧するセーブを選択");
             if (file is null) return;
             try { await bank.RecoverMoveAsync(file); }
             catch (SaveRecoveryRequiredException ex)
@@ -211,7 +211,7 @@ public sealed class BankPage : ContentPage
             return;
         }
         if (!await DisplayAlertAsync(item.Pokemon.Name, detail + "\n\n書き込みを確認した後、バンクから取り除きます。エミュレータを終了してください。", "セーブへ移動", "閉じる")) return;
-        var target = await documents.PickAsync();
+        var target = await RegisteredSavePicker.PickAsync(this, registry, documents, "引き出し先のセーブを選択");
         if (target is null) return;
         var data = await target.ReadAsync();
         var save = await Task.Run(() => reader.Read(data));
