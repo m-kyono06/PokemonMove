@@ -1,4 +1,5 @@
 ![Downloads](https://img.shields.io/github/downloads/m-kyono06/PokemonMove/total)
+![Visitors](https://visitor-badge.laobi.icu/badge?page_id=m-kyono06.PokemonMove)
 # PokemonMove
 
 Android 向けの、DS・3DS作品のポケモンをまとめて管理するアプリ。
