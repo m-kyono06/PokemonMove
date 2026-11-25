@@ -1,3 +1,4 @@
+![Downloads](https://img.shields.io/github/downloads/m-kyono06/PokemonMove/total)
 # PokemonMove
 
 Android 向けの、DS・3DS作品のポケモンをまとめて管理するアプリ。
